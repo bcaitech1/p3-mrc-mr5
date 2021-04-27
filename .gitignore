@@ -367,3 +367,6 @@ $RECYCLE.BIN/
 .cache/
 .conda/
 .gitconfig
+
+## Credentials
+.git-credentials

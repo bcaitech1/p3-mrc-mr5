@@ -354,3 +354,7 @@ $RECYCLE.BIN/
 
 # Local History for Visual Studio Code
 .history/
+
+
+## MRC Dataset
+**/input/data/data/*

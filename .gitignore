@@ -358,3 +358,10 @@ $RECYCLE.BIN/
 
 ## MRC Dataset
 **/input/data/data/*
+
+## Initial server environment related
+.profile
+.wget-hsts
+.vscode-server/
+.local/
+.cache/

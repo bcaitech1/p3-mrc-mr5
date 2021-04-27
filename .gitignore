@@ -365,3 +365,5 @@ $RECYCLE.BIN/
 .vscode-server/
 .local/
 .cache/
+.conda/
+.gitconfig

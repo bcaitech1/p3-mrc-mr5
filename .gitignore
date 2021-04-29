@@ -365,9 +365,11 @@ $RECYCLE.BIN/
 .vscode-server/
 .local/
 .cache/
+
 .conda/
 .bash_history
 .jupyter/
+.python_history
 
 ## Credentials
 .git-credentials

@@ -367,6 +367,7 @@ $RECYCLE.BIN/
 .cache/
 .conda/
 .bash_history
+.jupyter/
 
 ## Credentials
 .git-credentials

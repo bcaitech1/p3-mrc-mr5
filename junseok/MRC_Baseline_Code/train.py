@@ -19,7 +19,7 @@ from retrieval import SparseRetrieval
 
 from arguments import (
     ModelArguments,
-    DataTrainingArguments,
+    DataTrainingArguments
 )
 
 logger = logging.getLogger(__name__)
@@ -27,11 +27,40 @@ logger = logging.getLogger(__name__)
 def main():
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
-
-    parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments)
+    training_args = TrainingArguments(
+        output_dir='./results/Roberta-smooth/',          # output directory
+        save_total_limit=2,              # number of total save model.
+        save_steps=500,                 # model saving step.
+        num_train_epochs=5,              # total number of training epochs
+        learning_rate=5e-5,               # learning_rate
+        per_device_train_batch_size=16,  # batch size per device during training
+        per_device_eval_batch_size=16,   # batch size for evaluation
+        warmup_steps=500,                # number of warmup steps for learning rate scheduler
+        weight_decay=0.01,               # strength of weight decay
+        logging_dir='./logs/Roberta-smooth/',            # directory for storing logs
+        logging_steps=100,              # log saving step.
+        evaluation_strategy='steps', # evaluation strategy to adopt during training
+                                    # `no`: No evaluation during training.
+                                    # `steps`: Evaluate every `eval_steps`.
+                                    # `epoch`: Evaluate every end of epoch.
+        eval_steps = 300,            # evaluation step.
+        dataloader_num_workers=4,
+        label_smoothing_factor=0.5,
+        load_best_model_at_end=True, # save_strategy, save_steps will be ignored
+        metric_for_best_model="exact_match", # eval_accuracy
+        greater_is_better=True, # set True if metric isn't loss
+        do_train=True,
+        do_eval=True,
+        seed=42,
     )
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    parser = HfArgumentParser( # hint 만들어주는 것인듯?
+        (ModelArguments, DataTrainingArguments)
+    )
+    model_args, data_args = parser.parse_args_into_dataclasses()
+
+    training_args.output_dir= f'./result/{model_args.model_name_or_path}/'
+    # training_args.do_eval= True
+    # training_args.do_predict = True
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
@@ -71,9 +100,10 @@ def main():
     )
 
     # train & save sparse embedding retriever if true
-    if data_args.train_retrieval:
+    if data_args.train_retrieval:       
         run_sparse_embedding()
 
+    print(training_args.do_eval)
     # train or eval mrc model
     if training_args.do_train or training_args.do_eval:
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)

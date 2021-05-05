@@ -3,24 +3,12 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass
-class TrainingArguments:
-    output_dir: str = field(
-        default= f'./result/',
-        metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
-    )
-    do_train: bool = field(default=False, metadata={"help": "Whether to run training."})
-    do_eval: bool = field(default=None, metadata={"help": "Whether to run eval on the dev set."})
-    do_predict: bool = field(default=False, metadata={"help": "Whether to run predictions on the test set."})
-    
-
-
-@dataclass
 class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     model_name_or_path: str = field(
-        default="bert-base-multilingual-cased",
+        default="monologg/kobert",
         metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
     )
     config_name: Optional[str] = field(

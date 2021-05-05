@@ -23,32 +23,37 @@ from arguments import (
 )
 
 logger = logging.getLogger(__name__)
-
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 def main():
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
+    temp = model_args.model_name_or_path
+    temp.replace('/','_')
+    output_dir= f'./result/{temp}/'
+    logging_dir= f'./logs/{temp}/'
     training_args = TrainingArguments(
-        output_dir='./results/Roberta-smooth/',          # output directory
+        output_dir=output_dir,           # output directory
         save_total_limit=2,              # number of total save model.
-        save_steps=500,                 # model saving step.
-        num_train_epochs=5,              # total number of training epochs
-        learning_rate=5e-5,               # learning_rate
-        per_device_train_batch_size=16,  # batch size per device during training
-        per_device_eval_batch_size=16,   # batch size for evaluation
+        save_steps=500,                  # model saving step.
+        num_train_epochs=4,              # total number of training epochs
+        learning_rate=5e-5,              # learning_rate
+        per_device_train_batch_size=32,  # batch size per device during training
+        per_device_eval_batch_size=32,   # batch size for evaluation
         warmup_steps=500,                # number of warmup steps for learning rate scheduler
         weight_decay=0.01,               # strength of weight decay
-        logging_dir='./logs/Roberta-smooth/',            # directory for storing logs
+        logging_dir=logging_dir,            # directory for storing logs
         logging_steps=100,              # log saving step.
-        evaluation_strategy='steps', # evaluation strategy to adopt during training
+        evaluation_strategy='steps',# evaluation strategy to adopt during training
                                     # `no`: No evaluation during training.
                                     # `steps`: Evaluate every `eval_steps`.
                                     # `epoch`: Evaluate every end of epoch.
-        eval_steps = 300,            # evaluation step.
+        eval_steps = 300,           # evaluation step.
         dataloader_num_workers=4,
-        label_smoothing_factor=0.5,
         load_best_model_at_end=True, # save_strategy, save_steps will be ignored
         metric_for_best_model="exact_match", # eval_accuracy
         greater_is_better=True, # set True if metric isn't loss
+        label_smoothing_factor=0.5,
+        fp16=True,
         do_train=True,
         do_eval=True,
         seed=42,
@@ -57,13 +62,14 @@ def main():
         (ModelArguments, DataTrainingArguments)
     )
     model_args, data_args = parser.parse_args_into_dataclasses()
-
-    training_args.output_dir= f'./result/{model_args.model_name_or_path}/'
-    # training_args.do_eval= True
-    # training_args.do_predict = True
-
-    print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.dataset_name}")
+    i = 0
+    while os.path.exists(training_args.output_dir):
+        training_args.output_dir= f'./result/{temp}_{i}/'
+        training_args.logging_dir= f'./logs/{temp}_{i}/'
+        i+=1
+    print(f"training Data : {training_args}")
+    print(f"model Data : {model_args}")
+    print(f"data : {data_args}")
 
     # Setup logging
     logging.basicConfig(
@@ -103,7 +109,6 @@ def main():
     if data_args.train_retrieval:       
         run_sparse_embedding()
 
-    print(training_args.do_eval)
     # train or eval mrc model
     if training_args.do_train or training_args.do_eval:
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
@@ -314,9 +319,11 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
             return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
     metric = load_metric("squad")
-
+    
     def compute_metrics(p: EvalPrediction):
-        return metric.compute(predictions=p.predictions, references=p.label_ids)
+        result = metric.compute(predictions=p.predictions, references=p.label_ids)
+        result['eval_exact_match'] = result['exact_match']
+        return result
 
     # Initialize our Trainer
     trainer = QuestionAnsweringTrainer(

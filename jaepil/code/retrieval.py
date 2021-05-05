@@ -18,6 +18,13 @@ from konlpy.tag import Mecab
 import time
 from contextlib import contextmanager
 
+import os, sys
+from pathlib import Path
+from glob import glob
+
+BASE_PATH = Path('.').resolve().parent
+sys.path.append(BASE_PATH.as_posix())
+
 @contextmanager
 def timer(name):
     t0 = time.time()
@@ -184,11 +191,11 @@ class SparseRetrieval:
                     "question": example["question"],
                     "id": example['id'],  # original id
                     "context_id": doc_indices[idx][0],  # retrieved id
-                    "context": self.contexts[doc_indices[idx][0]]  # retrieved doument
+                    "context": self.contexts[doc_indices[idx][0]]  # retrieved document
                 }
                 if 'context' in example.keys() and 'answers' in example.keys():
-                    tmp["original_context"]: example['context']  # original document
-                    tmp["answers"]: example['answers']           # original answer
+                    tmp["original_context"] = example['context']  # original document
+                    tmp["answers"] = example['answers']           # original answer
                 total.append(tmp)
 
             cqas = pd.DataFrame(total)

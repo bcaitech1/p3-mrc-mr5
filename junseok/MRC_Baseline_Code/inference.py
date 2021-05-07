@@ -11,7 +11,7 @@ import sys
 from datasets import load_metric, load_from_disk, Sequence, Value, Features, Dataset, DatasetDict
 
 from transformers import AutoConfig, AutoModelForQuestionAnswering, AutoTokenizer
-
+from kobert_tokenizer import KoBertTokenizer
 from transformers import (
     DataCollatorWithPadding,
     EvalPrediction,
@@ -31,13 +31,33 @@ from arguments import (
 
 logger = logging.getLogger(__name__)
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+def get_recent_model():
+    models_dir = './result'
+    all_models = [models_dir+'/'+d for d in os.listdir(models_dir) if os.path.isdir(models_dir+'/'+d)]
+    latest_models = max(all_models, key=os.path.getmtime)
+    all_checkpoints = [latest_models+'/'+d for d in os.listdir(latest_models) if os.path.isdir(latest_models+'/'+d)]
+    latest_checkpoints = max(all_checkpoints, key=os.path.getmtime)
+    return latest_models.replace(models_dir+'/', ''), latest_checkpoints
+
 
 def main():
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
-
+    parser = HfArgumentParser( # hint 만들어주는 것인듯?
+        (ModelArguments, DataTrainingArguments)
+    )
+    model_args, data_args = parser.parse_args_into_dataclasses()
+    model_name = model_args.model_name_or_path
+    if model_name==None:
+        model_name, model_args.model_name_or_path = get_recent_model()
+    else:
+        model_name = model_name.replace('/','_')
+    output_dir= f'./submit/{model_name}/'
+    logging_dir= f'./logs/{model_name}/'
     training_args = TrainingArguments(
-        output_dir='./results/Roberta-smooth/',          # output directory
+        output_dir=output_dir,          # output directory
         save_total_limit=2,              # number of total save model.
         save_steps=500,                 # model saving step.
         num_train_epochs=5,              # total number of training epochs
@@ -46,7 +66,7 @@ def main():
         per_device_eval_batch_size=16,   # batch size for evaluation
         warmup_steps=500,                # number of warmup steps for learning rate scheduler
         weight_decay=0.01,               # strength of weight decay
-        logging_dir='./logs/Roberta-smooth/',            # directory for storing logs
+        logging_dir=logging_dir,            # directory for storing logs
         logging_steps=100,              # log saving step.
         evaluation_strategy='steps', # evaluation strategy to adopt during training
                                     # `no`: No evaluation during training.
@@ -62,19 +82,15 @@ def main():
         do_predict=True,
         seed=42,
     )
-    parser = HfArgumentParser( # hint 만들어주는 것인듯?
-        (ModelArguments, DataTrainingArguments)
-    )
-    model_args, data_args = parser.parse_args_into_dataclasses()
-    data_args.dataset_name = './data/test_dataset/'
-    training_args.output_dir = f'./submit/{model_args.model_name_or_path}/'
     i = 0
     while os.path.exists(training_args.output_dir):
-        training_args.output_dir= f'./submit/{model_args.model_name_or_path}_{i}/'
+        training_args.output_dir= f'./result/{model_name}_{i}/'
+        training_args.logging_dir= f'./logs/{model_name}_{i}/'
         i+=1
 
-    print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.dataset_name}")
+    print(f"training Data : {training_args}")
+    print(f"model Data : {model_args}")
+    print(f"data : {data_args}")
 
     # Setup logging
     logging.basicConfig(
@@ -88,22 +104,32 @@ def main():
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
+    if training_args.do_predict:
+        data_args.dataset_name = './data/test_dataset'
 
     datasets = load_from_disk(data_args.dataset_name)
     print(datasets)
-
     # Load pretrained model and tokenizer
     config = AutoConfig.from_pretrained(
         model_args.config_name
         if model_args.config_name
         else model_args.model_name_or_path,
     )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name
-        if model_args.tokenizer_name
-        else model_args.model_name_or_path,
-        use_fast=True,
-    )
+    if "ko" in model_args.model_name_or_path:
+        print(f"using korean tokenizer for {model_name}")
+        tokenizer = KoBertTokenizer.from_pretrained(
+            model_args.tokenizer_name
+            if model_args.tokenizer_name
+            else model_args.model_name_or_path,
+            use_fast=True
+        )
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_args.tokenizer_name
+            if model_args.tokenizer_name
+            else model_args.model_name_or_path,
+            use_fast=True,
+        )
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -161,6 +187,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
 
     # check if there is an error
     last_checkpoint, max_seq_length = check_no_error(training_args, data_args, tokenizer, datasets)
+    # last_checkpoint, max_seq_length = None, min(data_args.max_seq_length, tokenizer.model_max_length)
 
     # Validation preprocessing
     def prepare_validation_features(examples):

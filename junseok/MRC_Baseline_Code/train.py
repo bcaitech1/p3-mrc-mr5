@@ -4,7 +4,7 @@ import sys
 from datasets import load_metric, load_from_disk
 
 from transformers import AutoConfig, AutoModelForQuestionAnswering, AutoTokenizer
-
+from kobert_tokenizer import KoBertTokenizer
 from transformers import (
     DataCollatorWithPadding,
     EvalPrediction,
@@ -27,15 +27,23 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 def main():
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
+    
+    parser = HfArgumentParser( # hint 만들어주는 것인듯?
+        (ModelArguments, DataTrainingArguments)
+    )
+    model_args, data_args = parser.parse_args_into_dataclasses()
+
     temp = model_args.model_name_or_path
-    temp.replace('/','_')
+    if temp==None:
+        temp = model_args.model_name_or_path = "monologg/kobert"
+    temp = temp.replace('/','_')
     output_dir= f'./result/{temp}/'
     logging_dir= f'./logs/{temp}/'
     training_args = TrainingArguments(
         output_dir=output_dir,           # output directory
-        save_total_limit=2,              # number of total save model.
+        save_total_limit=1,              # number of total save model.
         save_steps=500,                  # model saving step.
-        num_train_epochs=4,              # total number of training epochs
+        num_train_epochs=5,              # total number of training epochs
         learning_rate=5e-5,              # learning_rate
         per_device_train_batch_size=32,  # batch size per device during training
         per_device_eval_batch_size=32,   # batch size for evaluation
@@ -58,10 +66,6 @@ def main():
         do_eval=True,
         seed=42,
     )
-    parser = HfArgumentParser( # hint 만들어주는 것인듯?
-        (ModelArguments, DataTrainingArguments)
-    )
-    model_args, data_args = parser.parse_args_into_dataclasses()
     i = 0
     while os.path.exists(training_args.output_dir):
         training_args.output_dir= f'./result/{temp}_{i}/'
@@ -93,12 +97,21 @@ def main():
         if model_args.config_name
         else model_args.model_name_or_path,
     )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name
-        if model_args.tokenizer_name
-        else model_args.model_name_or_path,
-        use_fast=True,
-    )
+    if "ko" in model_args.model_name_or_path:
+        print(f"using korean tokenizer for {model_args.model_name_or_path}")
+        tokenizer = KoBertTokenizer.from_pretrained(
+            model_args.tokenizer_name
+            if model_args.tokenizer_name
+            else model_args.model_name_or_path,
+            use_fast=True
+        )
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_args.tokenizer_name
+            if model_args.tokenizer_name
+            else model_args.model_name_or_path,
+            use_fast=True,
+        )
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -138,6 +151,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
 
     # check if there is an error
     last_checkpoint, max_seq_length = check_no_error(training_args, data_args, tokenizer, datasets)
+    # last_checkpoint, max_seq_length = None, min(data_args.max_seq_length, tokenizer.model_max_length)
 
     # Training preprocessing
     def prepare_train_features(examples):

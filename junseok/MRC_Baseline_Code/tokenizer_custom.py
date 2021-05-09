@@ -1,4 +1,4 @@
-# # from kobert_tokenizer import KoBertTokenizer
+# from kobert_tokenizer import KoBertTokenizer
 
 # from transformers import AutoConfig, AutoModelForQuestionAnswering, AutoTokenizer
 # import os
@@ -6,10 +6,10 @@
 #     "facebook/mbart-large-cc25",
 #     use_fast=True,
 # )
-# # tokenizer = KoBertTokenizer.from_pretrained(
-# #     "monologg/kobert",
-# #     use_fast=True,
-# # )
+# tokenizer = KoBertTokenizer.from_pretrained(
+#     "monologg/kobert",
+#     use_fast=True,
+# )
 
 # print(dir(tokenizer))
 # # tokenizer
@@ -45,57 +45,67 @@
 # print("*************")
 # print(X[3,:])
 
-""" Implementation of OKapi BM25 with sklearn's TfidfVectorizer
-Distributed as CC-0 (https://creativecommons.org/publicdomain/zero/1.0/)
-"""
+# """ Implementation of OKapi BM25 with sklearn's TfidfVectorizer
+# Distributed as CC-0 (https://creativecommons.org/publicdomain/zero/1.0/)
+# """
+
+# import numpy as np
+# from sklearn.feature_extraction.text import TfidfVectorizer
+# from scipy import sparse
+
+
+# class BM25(object):
+#     def __init__(self, b=0.75, k1=1.6):
+#         self.vectorizer = TfidfVectorizer(norm=None, smooth_idf=False)
+#         self.b = b
+#         self.k1 = k1
+
+#     def fit(self, X):
+#         """ Fit IDF to documents X """
+#         self.vectorizer.fit(X)
+#         y = super(TfidfVectorizer, self.vectorizer).transform(X)
+#         self.avdl = y.sum(1).mean()
+
+#     def transform(self, q, X):
+#         """ Calculate BM25 between query q and documents X """
+#         b, k1, avdl = self.b, self.k1, self.avdl
+
+#         # apply CountVectorizer
+#         X = super(TfidfVectorizer, self.vectorizer).transform(X)
+#         len_X = X.sum(1).A1
+#         q, = super(TfidfVectorizer, self.vectorizer).transform([q])
+#         assert sparse.isspmatrix_csr(q)
+
+#         # convert to csc for better column slicing
+#         X = X.tocsc()[:, q.indices]
+#         denom = X + (k1 * (1 - b + b * len_X / avdl))[:, None]
+#         # idf(t) = log [ n / df(t) ] + 1 in sklearn, so it need to be coneverted
+#         # to idf(t) = log [ n / df(t) ] with minus 1
+#         idf = self.vectorizer._tfidf.idf_[None, q.indices] - 1.
+#         numer = X.multiply(np.broadcast_to(idf, X.shape)) * (k1 + 1)                                                          
+#         return (numer / denom).sum(1).A1
+
+
+
+# #------------ End of library impl. Followings are the example -----------------
+
+# from sklearn.datasets import fetch_20newsgroups
+
+
+# # texts = fetch_20newsgroups(subset='train').data
+# # bm25 = BM25()
+# # bm25.fit(texts[5:])
+# # print(bm25.transform(texts[:5], texts))
+# test = [i for i in range(103)]
+# for i in range(0,len(test),10):
+#     print(test[i:i+10])
 
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from scipy import sparse
+# a = [[1, 2, 3],[4,5,6],[7,8,9]],[[1,2,3],[4,5,6],[7,8,9]]
+# a = np.asarray(a)
+# print(a.shape)
+# print(a[:1,1])
+# print(a[:1,None])
 
-
-class BM25(object):
-    def __init__(self, b=0.75, k1=1.6):
-        self.vectorizer = TfidfVectorizer(norm=None, smooth_idf=False)
-        self.b = b
-        self.k1 = k1
-
-    def fit(self, X):
-        """ Fit IDF to documents X """
-        self.vectorizer.fit(X)
-        y = super(TfidfVectorizer, self.vectorizer).transform(X)
-        self.avdl = y.sum(1).mean()
-
-    def transform(self, q, X):
-        """ Calculate BM25 between query q and documents X """
-        b, k1, avdl = self.b, self.k1, self.avdl
-
-        # apply CountVectorizer
-        X = super(TfidfVectorizer, self.vectorizer).transform(X)
-        len_X = X.sum(1).A1
-        q, = super(TfidfVectorizer, self.vectorizer).transform([q])
-        assert sparse.isspmatrix_csr(q)
-
-        # convert to csc for better column slicing
-        X = X.tocsc()[:, q.indices]
-        denom = X + (k1 * (1 - b + b * len_X / avdl))[:, None]
-        # idf(t) = log [ n / df(t) ] + 1 in sklearn, so it need to be coneverted
-        # to idf(t) = log [ n / df(t) ] with minus 1
-        idf = self.vectorizer._tfidf.idf_[None, q.indices] - 1.
-        numer = X.multiply(np.broadcast_to(idf, X.shape)) * (k1 + 1)                                                          
-        return (numer / denom).sum(1).A1
-
-
-
-#------------ End of library impl. Followings are the example -----------------
-
-from sklearn.datasets import fetch_20newsgroups
-
-
-# texts = fetch_20newsgroups(subset='train').data
-# bm25 = BM25()
-# bm25.fit(texts[5:])
-# print(bm25.transform(texts[:5], texts))
-test = [i for i in range(103)]
-for i in range(0,len(test),10):
-    print(test[i:i+10])
+a = [1,2,3]
+print(np.indices((2,3)))

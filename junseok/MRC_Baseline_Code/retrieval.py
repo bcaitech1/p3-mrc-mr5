@@ -228,8 +228,20 @@ class SparseRetrieval_BM25Plus:
         self.indexer = None
         self.avdl = None
         self.len_context = None
+        if "test" in context_path:
+            self.isTest = True
 
     def get_sparse_embedding(self):
+        if self.isTest:
+            print("Build passage embedding")
+            self.tfidfv.fit(self.contexts)
+            self.p_embedding = super(TfidfVectorizer,self.tfidfv).transform(self.contexts)
+            print(self.p_embedding.shape)            
+            print(self.p_embedding)            
+            print("Embedding pickle saved.")            
+            self.avdl = self.p_embedding.sum(1).mean()
+            self.len_context = self.p_embedding.sum(1).A1
+            return
         # Pickle save.
         pickle_name = f"sparse_embedding_bm25.bin"
         tfidfv_name = f"tfidv.bin"
@@ -321,16 +333,19 @@ class SparseRetrieval_BM25Plus:
         with timer("transform"):
             query_vec = self.tfidfv.transform([query])
             print(query_vec.shape)
+            print(query_vec)
         assert (
                 np.sum(query_vec) != 0
         ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
         
         # print(query_vec.indices, self.p_embedding.tocsc().shape)
         print("***")
-        print(query_vec.indices.shape)
-        print(self.p_embedding.shape)
-        print(self.p_embedding.tocsc().shape, self.p_embedding.tocsc()[:, query_vec.indices].shape)
+        print(query_vec.indices)
+        # print(self.p_embedding.shape)
+        # print(self.p_embedding.tocsc().shape, self.p_embedding.tocsc()[:, query_vec.indices].shape)
         context = self.p_embedding.tocsc()[:, query_vec.indices]
+        # context = self.p_embedding.tocsc()
+        # context = self.p_embedding
         print(context.shape)
         
         denom = context + (self.k1 * (1-self.b + self.b*self.len_context/self.avdl))[:,None]
@@ -622,6 +637,7 @@ class SparseRetrieval_BM25P:
 
 if __name__ == "__main__":
     # Test sparse
+    
     org_dataset = load_from_disk("./data/train_dataset")
     full_ds = concatenate_datasets(
         [
@@ -652,12 +668,14 @@ if __name__ == "__main__":
     #     tokenize_fn=tokenize,
     #     data_path="./data",
     #     context_path=wiki_path)
-
+    test_path = "test.json"
     retriever = SparseRetrieval_BM25Plus(
         # tokenize_fn=tokenizer.tokenize,
         tokenize_fn=tokenize,
         data_path="./data",
-        context_path=wiki_path)
+        # context_path=wiki_path
+        context_path=test_path
+        )
 
     # retriever = SparseRetrieval(
     #     # tokenize_fn=tokenizer.tokenize,

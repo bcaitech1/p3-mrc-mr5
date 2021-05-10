@@ -401,7 +401,6 @@ tags
 ### User-specific ignore ###
 jaepil/code/install/*
 jaepil/temp/*
-
 junseok/MRC_Baseline_Code/data/*
 junseok/MRC_Baseline_Code/result/*
 junseok/MRC_Baseline_Code/submit/*

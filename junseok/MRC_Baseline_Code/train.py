@@ -35,10 +35,10 @@ def main():
 
     temp = model_args.model_name_or_path
     if temp==None:
-        temp = model_args.model_name_or_path = "monologg/kobert"
+        temp = model_args.model_name_or_path = "xlm-roberta-base"
     temp = temp.replace('/','_')
-    output_dir= f'./result/{temp}/'
-    logging_dir= f'./logs/{temp}/'
+    output_dir= f'./result/{temp}{model_args.suffix}/'
+    logging_dir= f'./logs/{temp}{model_args.suffix}/'
     training_args = TrainingArguments(
         output_dir=output_dir,           # output directory
         save_total_limit=1,              # number of total save model.
@@ -68,8 +68,8 @@ def main():
     )
     i = 0
     while os.path.exists(training_args.output_dir):
-        training_args.output_dir= f'./result/{temp}_{i}/'
-        training_args.logging_dir= f'./logs/{temp}_{i}/'
+        training_args.output_dir= f'./result/{temp}{model_args.suffix}_{i}/'
+        training_args.logging_dir= f'./logs/{temp}{model_args.suffix}_{i}/'
         i+=1
     print(f"training Data : {training_args}")
     print(f"model Data : {model_args}")
@@ -119,7 +119,8 @@ def main():
     )
 
     # train & save sparse embedding retriever if true
-    if data_args.train_retrieval:       
+    if data_args.train_retrieval:      
+        print("train retrieval") 
         run_sparse_embedding()
 
     # train or eval mrc model

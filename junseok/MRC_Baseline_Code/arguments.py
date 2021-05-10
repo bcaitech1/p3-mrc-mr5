@@ -3,6 +3,16 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass
+class InferencelArguments:
+    """
+    Arguments pertaining to which retrieval Model we are going to inference.
+    """
+    retrieval: str = field(
+        default=None,
+        metadata={"help": "retrieval method for retrieval step(default: TF-IDF Sparse)"}
+    )
+
+@dataclass
 class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
@@ -10,6 +20,10 @@ class ModelArguments:
     model_name_or_path: str = field(
         default=None,
         metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+    )
+    suffix: str = field(
+        default="",
+        metadata={"help": "suffix name for log, result, submit data folder(default: None)"}
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
@@ -24,7 +38,7 @@ class DataTrainingArguments:
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
     dataset_name: Optional[str] = field(
-        default="./data/train_dataset", metadata={"help": "The name of the dataset to use."}
+        default="./data/KLUQUAD", metadata={"help": "The name of the dataset to use."}
     )
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}

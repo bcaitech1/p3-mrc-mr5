@@ -4,7 +4,6 @@ Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
 대부분의 로직은 train.py 와 비슷하나 retrieval, predict
 """
 
-
 import logging
 import os
 import sys
@@ -22,11 +21,12 @@ from transformers import (
 
 from utils_qa import postprocess_qa_predictions, check_no_error, tokenize
 from trainer_qa import QuestionAnsweringTrainer
-from retrieval import SparseRetrieval
+from retrieval import SparseRetrieval, SparseRetrieval_BM25, SparseRetrieval_BM25PLUS
 
 from arguments import (
     ModelArguments,
     DataTrainingArguments,
+    InferencelArguments
 )
 
 logger = logging.getLogger(__name__)
@@ -46,16 +46,16 @@ def main():
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
     parser = HfArgumentParser( # hint 만들어주는 것인듯?
-        (ModelArguments, DataTrainingArguments)
+        (ModelArguments, DataTrainingArguments, InferencelArguments)
     )
-    model_args, data_args = parser.parse_args_into_dataclasses()
+    model_args, data_args, inf_args = parser.parse_args_into_dataclasses()
     model_name = model_args.model_name_or_path
     if model_name==None:
         model_name, model_args.model_name_or_path = get_recent_model()
     else:
         model_name = model_name.replace('/','_')
-    output_dir= f'./submit/{model_name}/'
-    logging_dir= f'./logs/{model_name}/'
+    output_dir= f'./submit/{model_name}{model_args.suffix}/'
+    logging_dir= f'./logs/{model_name}{model_args.suffix}/'
     training_args = TrainingArguments(
         output_dir=output_dir,          # output directory
         save_total_limit=2,              # number of total save model.
@@ -84,8 +84,8 @@ def main():
     )
     i = 0
     while os.path.exists(training_args.output_dir):
-        training_args.output_dir= f'./result/{model_name}_{i}/'
-        training_args.logging_dir= f'./logs/{model_name}_{i}/'
+        training_args.output_dir= f'./result/{model_name}{model_args.suffix}_{i}/'
+        training_args.logging_dir= f'./logs/{model_name}{model_args.suffix}_{i}/'
         i+=1
 
     print(f"training Data : {training_args}")
@@ -138,19 +138,27 @@ def main():
 
     # run passage retrieval if true
     if data_args.eval_retrieval:
-        datasets = run_sparse_retrieval(datasets, training_args)
+        datasets = run_sparse_retrieval(datasets, training_args, inf_args)
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
-def run_sparse_retrieval(datasets, training_args):
+def run_sparse_retrieval(datasets, training_args, inf_args):
     #### retreival process ####
-
-    retriever = SparseRetrieval(tokenize_fn=tokenize,
-                                data_path="./data",
-                                context_path="wikipedia_documents.json")
+    if inf_args.retrieval == None:
+        retriever = SparseRetrieval(tokenize_fn=tokenize,
+                                    data_path="./data",
+                                    context_path="wikipedia_documents.json")
+    elif inf_args.retrieval.lower() =="bm25plus" or inf_args.retrieval.lower() =="bm25p":
+        retriever = SparseRetrieval_BM25PLUS(tokenize_fn=tokenize,
+                                    data_path="./data",
+                                    context_path="wikipedia_documents.json")
+    elif inf_args.retrieval.lower() == "bm25":        
+        retriever = SparseRetrieval_BM25(tokenize_fn=tokenize,
+                                    data_path="./data",
+                                    context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
     df = retriever.retrieve(datasets['validation'])
 

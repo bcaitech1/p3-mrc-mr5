@@ -22,7 +22,7 @@ from transformers import (
 
 from utils_qa import postprocess_qa_predictions, check_no_error, tokenize
 from trainer_qa import QuestionAnsweringTrainer
-from retrieval import SparseRetrieval
+from retrieval import SparseRetrieval, SparseRetrieval_BM25P
 
 from arguments import (
     ModelArguments,
@@ -91,7 +91,7 @@ def main():
 
 def run_sparse_retrieval(datasets, training_args):
     #### retreival process ####
-
+    
     retriever = SparseRetrieval(tokenize_fn=tokenize,
                                 data_path="./data",
                                 context_path="wikipedia_documents.json")

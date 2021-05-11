@@ -1,6 +1,21 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
+from pathlib import Path
+import sys
+
+BASE_PATH = Path('.').resolve().parent
+sys.path.append(BASE_PATH.as_posix())
+
+data_path = BASE_PATH / "input" / "data" / "data"
+
+train_path = data_path / "train_dataset"
+train_data_path = train_path / "train"
+val_data_path = train_path / "validation"
+
+test_path = data_path / "test_dataset"
+test_data_path = test_path / "validation"
+
 @dataclass
 class ModelArguments:
     """
@@ -23,7 +38,7 @@ class DataTrainingArguments:
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
     dataset_name: Optional[str] = field(
-        default="./data/train_dataset", metadata={"help": "The name of the dataset to use."}
+        default=train_path, metadata={"help": "The name of the dataset to use."}
     )
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}

@@ -398,6 +398,9 @@ tags
 .git-credentials
 .gitconfig
 
+## Misk
+.pororo/*
+
 ### User-specific ignore ###
 jaepil/code/install/*
 jaepil/temp/*

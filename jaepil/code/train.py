@@ -28,6 +28,7 @@ def main():
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
+    # CLI상에서 또는 default 값으로 정의된 Argument를 받아온다. 
     parser = HfArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
@@ -46,13 +47,14 @@ def main():
     # Set the verbosity to info of the Transformers logger (on main process only):
     logger.info("Training/evaluation parameters %s", training_args)
 
-    # Set seed before initializing model.
+    # Set seed before initializing model. 시드 설정
     set_seed(training_args.seed)
 
+    # disk상의 데이터셋 불러온다. 
     datasets = load_from_disk(data_args.dataset_name)
     print(datasets)
 
-    # Load pretrained model and tokenizer
+    # Load pretrained model and tokenizer. config/tokenizer/model 객체 선언
     config = AutoConfig.from_pretrained(
         model_args.config_name
         if model_args.config_name
@@ -70,12 +72,12 @@ def main():
         config=config,
     )
 
-    # train & save sparse embedding retriever if true
-    if data_args.train_retrieval:
+    # train & save sparse embedding retriever if true 
+    if data_args.train_retrieval: # retrieval 훈련해야 하는 경우 실행함. 
         run_sparse_embedding()
 
     # train or eval mrc model
-    if training_args.do_train or training_args.do_eval:
+    if training_args.do_train or training_args.do_eval: # mrc 모델을 훈련하거나 평가해야 하는 경우 실행함. 
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
@@ -89,6 +91,8 @@ def run_sparse_embedding():
 def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     # Preprocessing the datasets.
     # Preprocessing is slighlty different for training and evaluation.
+    
+    # 데이터셋에서 각 열의 이름을 확인함. 
     if training_args.do_train:
         column_names = datasets["train"].column_names
     else:
@@ -99,9 +103,11 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     answer_column_name = "answers" if "answers" in column_names else column_names[2]
 
     # Padding side determines if we do (question|context) or (context|question).
+    # 패딩을 오른쪽에서부터 할지 결정 (qeustion|context) 니까 오른쪽 패딩. 
     pad_on_right = tokenizer.padding_side == "right"
 
     # check if there is an error
+    # 에러 발생하는지 점검하고 만약 이전에 학습된 checkpoint가 있으면 그 모델을 불러옴. 
     last_checkpoint, max_seq_length = check_no_error(training_args, data_args, tokenizer, datasets)
 
     # Training preprocessing
@@ -184,6 +190,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
 
         return tokenized_examples
 
+    # 훈련 해야 할 경우 prepare_train_features를 dataset에 매핑해 훈련 데이터셋을 전처리. 
     if training_args.do_train:
         if "train" not in datasets:
             raise ValueError("--do_train requires a train dataset")
@@ -239,6 +246,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
             ]
         return tokenized_examples
 
+    # 마찬가지로, 평가를 해야 할 경우 prepare_validation_features로 매핑하여 평가 데이터셋을 전처리함. 
     if training_args.do_eval:
         eval_dataset = datasets["validation"]
 
@@ -260,6 +268,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     )
 
     # Post-processing:
+    # 결과를 metric이 확인할 수 있는 형태로 바꿔주어야 함. 
     def post_processing_function(examples, features, predictions, training_args):
         # Post-processing: we match the start logits and end logits to answers in the original context.
         predictions = postprocess_qa_predictions(
@@ -273,9 +282,12 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         formatted_predictions = [
             {"id": k, "prediction_text": v} for k, v in predictions.items()
         ]
+
+        # do_predict일 경우 predict한 결과를 그대로 return 
         if training_args.do_predict:
             return formatted_predictions
 
+        # 평가를 위해 do_eval하는 경우는 predictions와 label_ids 라는 attributes를 가지는 EvalPrediction 객체를 반환
         elif training_args.do_eval:
             references = [
                 {"id": ex["id"], "answers": ex[answer_column_name]}
@@ -283,12 +295,14 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
             ]
             return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
+    # Squad의 메트릭을 그대로 가져다 씀. 
     metric = load_metric("squad")
 
     def compute_metrics(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     # Initialize our Trainer
+    # 앞에서 만든 것들은 다 trainer에 넣기 위해 준비한 것들이다. 
     trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,

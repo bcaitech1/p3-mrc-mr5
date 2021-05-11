@@ -1,7 +1,6 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
-
 @dataclass
 class InferencelArguments:
     """
@@ -31,7 +30,10 @@ class ModelArguments:
     tokenizer_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
-
+    reservation: str = field(
+        default=None,
+        metadata={"help": "Path to Training Arguments from outside and Training Schedule. If you set this path, all other given arguments will be ignored. (default: None)"}
+    )
 @dataclass
 class DataTrainingArguments:
     """
@@ -48,7 +50,7 @@ class DataTrainingArguments:
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
     max_seq_length: int = field(
-        default=384,
+        default=512,
         metadata={
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
                     "than this will be truncated, sequences shorter will be padded."
@@ -81,7 +83,3 @@ class DataTrainingArguments:
         default=True,
         metadata={"help":"Whether to run passage retrieval using sparse/dense embedding )."},
     )
-
-
-
-

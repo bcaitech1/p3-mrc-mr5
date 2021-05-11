@@ -115,7 +115,7 @@ def main():
         if model_args.config_name
         else model_args.model_name_or_path,
     )
-    if "ko" in model_args.model_name_or_path:
+    if "ko" in model_args.model_name_or_path and "bert" in model_args.model_name_or_path:
         print(f"using korean tokenizer for {model_name}")
         tokenizer = KoBertTokenizer.from_pretrained(
             model_args.tokenizer_name
@@ -160,7 +160,7 @@ def run_sparse_retrieval(datasets, training_args, inf_args):
                                     data_path="./data",
                                     context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
-    df = retriever.retrieve(datasets['validation'])
+    df = retriever.retrieve(datasets['validation'], 10)
 
     # faiss retrieval
     # df = retriever.retrieve_faiss(dataset['validation'])

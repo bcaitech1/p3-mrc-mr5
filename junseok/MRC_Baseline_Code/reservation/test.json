@@ -1,0 +1,61 @@
+{      
+    "config": {
+        "continue_error": "1"
+    },
+    "jobs":[
+        {
+            "train": {
+                "save_total_limit" : 2,
+                "save_steps" : 500,
+                "num_train_epochs": 5,
+                "learning_rate": 5e-5,
+                "eval_steps" : 300
+            },
+            "data": {
+                "dataset_name": "./data/KLUQUAD",
+                "overwrite_cache": "",
+                "max_seq_length": 512,
+                "pad_to_max_length": "",
+                "doc_stride": 128,
+                "max_answer_length": 30,
+                "train_retrieval": "1",
+                "eval_retrieval": "1"
+            },
+            "model": {
+                "model_name_or_path": "sangrimlee/bert-base-multilingual-cased-korquad",
+                "suffix": ""
+            },
+            "inference": {
+                "retrieval": "bm25plus"
+            }
+
+        },
+        {
+            "train": {
+                "save_total_limit" : 2,
+                "save_steps" : 500,
+                "num_train_epochs": 5,
+                "learning_rate": 5e-5,
+                "eval_steps" : 300
+            },
+            "data": {
+                "dataset_name": "./data/KLUQUAD",
+                "overwrite_cache": "",
+                "max_seq_length": 512,
+                "pad_to_max_length": "",
+                "doc_stride": 128,
+                "max_answer_length": 30,
+                "train_retrieval": "1",
+                "eval_retrieval": "1"
+            },
+            "model": {
+                "model_name_or_path": "monologg/koelectra-base-v3-finetuned-korquad",
+                "suffix": ""
+            },
+            "inference": {
+                "retrieval": "bm25plus"
+            }
+
+        }
+    ]
+}

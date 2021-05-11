@@ -32,6 +32,7 @@ def main():
         (ModelArguments, DataTrainingArguments)
     )
     model_args, data_args = parser.parse_args_into_dataclasses()
+    # if model_args.reservation:
 
     temp = model_args.model_name_or_path
     if temp==None:

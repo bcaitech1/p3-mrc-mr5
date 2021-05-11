@@ -530,7 +530,7 @@ class SparseRetrieval_BM25PLUS:
             # make retrieved result as dataframe
             total = []
             with timer("query exhaustive search"):
-                doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'], k=1)
+                doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'], topk)
             for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
                 # relev_doc_ids = [el for i, el in enumerate(self.ids) if i in doc_indices[idx]]
                 tmp = {
@@ -603,21 +603,14 @@ if __name__ == "__main__":
     #     data_path="./data",
     #     context_path=wiki_path)
     test_path = "test.json"
-    # retriever = SparseRetrieval_BM25Plus(
-    #     # tokenize_fn=tokenizer.tokenize,
-    #     tokenize_fn=tokenize,
-    #     data_path="./data",
-    #     context_path=wiki_path
-    #     # context_path=test_path
-    #     )
-
-    retriever = SparseRetrieval_BM25P(
+    retriever = SparseRetrieval_BM25PLUS(
         # tokenize_fn=tokenizer.tokenize,
         tokenize_fn=tokenize,
         data_path="./data",
         context_path=wiki_path
         # context_path=test_path
         )
+
     # retriever = SparseRetrieval(
     #     # tokenize_fn=tokenizer.tokenize,
     #     tokenize_fn=tokenize,
@@ -636,7 +629,7 @@ if __name__ == "__main__":
 
     # test bulk
     with timer("bulk query by exhaustive search"):
-        df = retriever.retrieve(full_ds)
+        df = retriever.retrieve(full_ds, 5)
         df['correct'] = df['original_context'] == df['context']
         print("correct retrieval result by exhaustive search", df['correct'].sum() / len(df))
     # with timer("bulk query by exhaustive search"):

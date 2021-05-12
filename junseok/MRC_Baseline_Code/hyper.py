@@ -53,10 +53,10 @@ def main():
         "save_strategy":"no",
         # "save_total_limit":1,              # number of total save model.
         # "save_steps":500,                  # model saving step.
-        "num_train_epochs":train_args.num_train_epochs,              # total number of training epochs
-        "learning_rate":train_args.learning_rate,              # learning_rate
-        "per_device_train_batch_size":train_args.per_device_train_batch_size,  # batch size per device during training
-        "per_device_eval_batch_size":train_args.per_device_train_batch_size,   # batch size for evaluation
+        # "num_train_epochs":train_args.num_train_epochs,              # total number of training epochs
+        # "learning_rate":train_args.learning_rate,              # learning_rate
+        # "per_device_train_batch_size":train_args.per_device_train_batch_size,  # batch size per device during training
+        # "per_device_eval_batch_size":train_args.per_device_train_batch_size,   # batch size for evaluation
         "warmup_steps":500,                # number of warmup steps for learning rate scheduler
         "weight_decay":0.01,               # strength of weight decay
         "logging_dir":logging_dir,            # directory for storing logs
@@ -67,9 +67,9 @@ def main():
                                     # `epoch`: Evaluate every end of epoch.
         "eval_steps" : 300,           # evaluation step.
         "dataloader_num_workers":4,
-        "load_best_model_at_end":True, # save_strategy, save_steps will be ignored
+        # "load_best_model_at_end":True, # save_strategy, save_steps will be ignored
         "metric_for_best_model":"exact_match", # eval_accuracy
-        "greater_is_better":True, # set True if metric isn't loss
+        # "greater_is_better":True, # set True if metric isn't loss
         "label_smoothing_factor":0.5,
         "fp16":True,
         "do_train":True,
@@ -90,7 +90,7 @@ def main():
     config = wandb.config
 
     training_args = TrainingArguments(
-        **config_default
+        **config
     )
 
     i = 0

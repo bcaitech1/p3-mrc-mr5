@@ -1,0 +1,94 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.10.30
+    framework: huggingface
+    huggingface_version: 4.5.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.7.7
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      2:
+      - 1
+      - 5
+      - 11
+      4: 3.7.7
+      5: 0.10.30
+      6: 4.5.0
+      8:
+      - 5
+dataloader_num_workers:
+  desc: null
+  value: 4
+do_eval:
+  desc: null
+  value: true
+do_train:
+  desc: null
+  value: true
+eval_steps:
+  desc: null
+  value: 300
+evaluation_strategy:
+  desc: null
+  value: steps
+fp16:
+  desc: null
+  value: true
+greater_is_better:
+  desc: null
+  value: true
+label_smoothing_factor:
+  desc: null
+  value: 0.5
+learning_rate:
+  desc: null
+  value: 5.0e-05
+load_best_model_at_end:
+  desc: null
+  value: true
+logging_dir:
+  desc: null
+  value: ./logs/monologg_koelectra-base-v3-finetuned-korquad/
+logging_steps:
+  desc: null
+  value: 100
+metric_for_best_model:
+  desc: null
+  value: exact_match
+num_train_epochs:
+  desc: null
+  value: 4
+output_dir:
+  desc: null
+  value: ./result/monologg_koelectra-base-v3-finetuned-korquad/
+per_device_eval_batch_size:
+  desc: null
+  value: 32
+per_device_train_batch_size:
+  desc: null
+  value: 32
+report_to:
+  desc: null
+  value: wandb
+run_name:
+  desc: null
+  value: monologg_koelectra-base-v3-finetuned-korquad
+save_strategy:
+  desc: null
+  value: 'no'
+seed:
+  desc: null
+  value: 42
+warmup_steps:
+  desc: null
+  value: 500
+weight_decay:
+  desc: null
+  value: 0.01

@@ -16,18 +16,25 @@ from transformers import (
 from utils_qa import postprocess_qa_predictions, check_no_error, tokenize
 from trainer_qa import QuestionAnsweringTrainer
 from retrieval import SparseRetrieval
+import wandb
 
 from arguments import (
     ModelArguments,
-    DataTrainingArguments
+    DataTrainingArguments,
 )
 
 logger = logging.getLogger(__name__)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 def main():
+    wandb.init(
+        project="koelectra",
+        entity='roadv',
+        tags=["baseline", "test"],
+        group="electra"
+    )
+    config = wandb.config
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
-    # --help flag 를 실행시켜서 확인할 수 도 있습니다.
-    
+    # --help flag 를 실행시켜서 확인할 수 도 있습니다.    
     parser = HfArgumentParser( # hint 만들어주는 것인듯?
         (ModelArguments, DataTrainingArguments)
     )
@@ -36,10 +43,18 @@ def main():
 
     temp = model_args.model_name_or_path
     if temp==None:
-        temp = model_args.model_name_or_path = "xlm-roberta-base"
+        temp = model_args.model_name_or_path = "monologg/koelectra-base-v3-finetuned-korquad"
+        # monologg/koelectra-base-v3-finetuned-korquad 
+        # sangrimlee/bert-base-multilingual-cased-korquad
+        # xlm-roberta-base
     temp = temp.replace('/','_')
     output_dir= f'./result/{temp}{model_args.suffix}/'
     logging_dir= f'./logs/{temp}{model_args.suffix}/'
+    i = 0
+    while os.path.exists(training_args.output_dir):
+        training_args.output_dir= f'./result/{temp}{model_args.suffix}_{i}/'
+        training_args.logging_dir= f'./logs/{temp}{model_args.suffix}_{i}/'
+        i+=1
     training_args = TrainingArguments(
         output_dir=output_dir,           # output directory
         save_total_limit=1,              # number of total save model.
@@ -66,12 +81,10 @@ def main():
         do_train=True,
         do_eval=True,
         seed=42,
+        report_to="wandb",
+        run_name=f"{temp}{model_args.suffix}_{i}",
     )
-    i = 0
-    while os.path.exists(training_args.output_dir):
-        training_args.output_dir= f'./result/{temp}{model_args.suffix}_{i}/'
-        training_args.logging_dir= f'./logs/{temp}{model_args.suffix}_{i}/'
-        i+=1
+
     print(f"training Data : {training_args}")
     print(f"model Data : {model_args}")
     print(f"data : {data_args}")
@@ -98,21 +111,21 @@ def main():
         if model_args.config_name
         else model_args.model_name_or_path,
     )
-    if "ko" in model_args.model_name_or_path:
-        print(f"using korean tokenizer for {model_args.model_name_or_path}")
-        tokenizer = KoBertTokenizer.from_pretrained(
-            model_args.tokenizer_name
-            if model_args.tokenizer_name
-            else model_args.model_name_or_path,
-            use_fast=True
-        )
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_args.tokenizer_name
-            if model_args.tokenizer_name
-            else model_args.model_name_or_path,
-            use_fast=True,
-        )
+    # if "ko" in model_args.model_name_or_path and "bert" in model_args.model_name_or_path:
+    #     print(f"using korean tokenizer for {model_args.model_name_or_path}")
+    #     tokenizer = KoBertTokenizer.from_pretrained(
+    #         model_args.tokenizer_name
+    #         if model_args.tokenizer_name
+    #         else model_args.model_name_or_path,
+    #         # use_fast=True
+    #     )
+    # else:
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.tokenizer_name
+        if model_args.tokenizer_name
+        else model_args.model_name_or_path,
+        use_fast=True,
+    )
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -397,4 +410,6 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
 
 
 if __name__ == "__main__":
+    # wandb.login()
     main()
+    wandb.finish()

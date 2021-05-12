@@ -1,0 +1,24 @@
+{
+    "os": "Linux-4.4.0-59-generic-x86_64-with-debian-buster-sid",
+    "python": "3.7.7",
+    "heartbeatAt": "2021-05-12T05:47:55.408999",
+    "startedAt": "2021-05-12T05:47:54.258866",
+    "docker": null,
+    "gpu": "Tesla P40",
+    "gpu_count": 1,
+    "cpu_count": 4,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "hyper.py",
+    "codePath": "junseok/MRC_Baseline_Code/hyper.py",
+    "git": {
+        "remote": "https://github.com/bcaitech1/p3-mrc-mr5.git",
+        "commit": "bad6ce4ba27416cdd8e407905de25f9a0f8b7d30"
+    },
+    "email": "roadvirushn@gmail.com",
+    "root": "/opt/ml/MyCode/p3-mrc-mr5",
+    "host": "fbe1f2451177",
+    "username": "root",
+    "executable": "/opt/conda/bin/python"
+}

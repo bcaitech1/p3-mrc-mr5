@@ -10,6 +10,17 @@ class InferencelArguments:
         default=None,
         metadata={"help": "retrieval method for retrieval step(default: TF-IDF Sparse)"}
     )
+@dataclass
+class TrainArguments:
+    learning_rate: float = field(
+        default=5e-5
+    )
+    num_train_epochs: int = field(
+        default=4
+    )
+    per_device_train_batch_size: int = field(
+        default=32
+    )
 
 @dataclass
 class ModelArguments:

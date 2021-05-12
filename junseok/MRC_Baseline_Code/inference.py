@@ -42,13 +42,7 @@ def get_recent_model():
     return latest_models.replace(models_dir+'/', ''), latest_checkpoints
 
 
-def main():
-    # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
-    # --help flag 를 실행시켜서 확인할 수 도 있습니다.
-    parser = HfArgumentParser( # hint 만들어주는 것인듯?
-        (ModelArguments, DataTrainingArguments, InferencelArguments)
-    )
-    model_args, data_args, inf_args = parser.parse_args_into_dataclasses()
+def main(model_args, data_args, inf_args):    
     model_name = model_args.model_name_or_path
     if model_name==None:
         model_name, model_args.model_name_or_path = get_recent_model()
@@ -318,4 +312,13 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         trainer.save_metrics("test", metrics)
 
 if __name__ == "__main__":
-    main()
+    # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
+    # --help flag 를 실행시켜서 확인할 수 도 있습니다.
+    parser = HfArgumentParser( # hint 만들어주는 것인듯?
+        (ModelArguments, DataTrainingArguments, InferencelArguments)
+    )
+    model_args, data_args, inf_args = parser.parse_args_into_dataclasses()
+    if model_args.reservation != None:
+        config, jobs = get_reservation()
+    else:
+        main(model_args, data_args, inf_args)

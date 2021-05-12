@@ -1,0 +1,8 @@
+wandb_version: 1
+
+learning_rate:
+  value: 0.0011954391660840128
+num_train_epochs:
+  value: 2
+per_device_train_batch_size:
+  value: 16

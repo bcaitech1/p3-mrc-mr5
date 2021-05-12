@@ -336,13 +336,13 @@ def check_no_error(training_args, data_args, tokenizer, datasets):
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Tokenizer check: this script requires a fast tokenizer.
-    if not isinstance(tokenizer, PreTrainedTokenizerFast):
-        raise ValueError(
-            "This example script only works for models that have a fast tokenizer. Checkout the big table of models "
-            "at https://huggingface.co/transformers/index.html#bigtable to find the model types that meet this "
-            "requirement"
-        )
+    # # Tokenizer check: this script requires a fast tokenizer.
+    # if not isinstance(tokenizer, PreTrainedTokenizerFast):
+    #     raise ValueError(
+    #         "This example script only works for models that have a fast tokenizer. Checkout the big table of models "
+    #         "at https://huggingface.co/transformers/index.html#bigtable to find the model types that meet this "
+    #         "requirement"
+    #     )
 
     if data_args.max_seq_length > tokenizer.model_max_length:
         logger.warn(

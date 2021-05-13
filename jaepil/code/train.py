@@ -85,7 +85,7 @@ def main():
 
 def run_sparse_embedding():
     retriever = SparseRetrieval(tokenize_fn=tokenize,
-                                data_path=data_args.data_path,
+                                data_path=path_args.data_path,
                                 context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
 

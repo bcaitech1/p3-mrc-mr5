@@ -20,11 +20,13 @@ from transformers import (
     set_seed,
 )
 
+## Custom libraries
 from utils_qa import postprocess_qa_predictions, check_no_error, tokenize
 from trainer_qa import QuestionAnsweringTrainer
 from retrieval import SparseRetrieval
 
 from arguments import (
+    PathArguments,
     ModelArguments,
     DataTrainingArguments,
 )
@@ -37,9 +39,9 @@ def main():
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
     parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments)
+        (PathArguments, ModelArguments, DataTrainingArguments, TrainingArguments)
     )
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    path_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.do_train = True
 
@@ -93,7 +95,7 @@ def run_sparse_retrieval(datasets, training_args):
     #### retreival process ####
 
     retriever = SparseRetrieval(tokenize_fn=tokenize,
-                                data_path="./data",
+                                data_path=path_args.data_path,
                                 context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
     df = retriever.retrieve(datasets['validation'])

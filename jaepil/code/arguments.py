@@ -1,20 +1,39 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pathlib import Path
 import sys
 
 BASE_PATH = Path('.').resolve().parent
 sys.path.append(BASE_PATH.as_posix())
-
-data_path = BASE_PATH / "input" / "data" / "data"
-
-train_path = data_path / "train_dataset"
-train_data_path = train_path / "train"
-val_data_path = train_path / "validation"
-
-test_path = data_path / "test_dataset"
-test_data_path = test_path / "validation"
+@dataclass
+class PathArguments:
+    """Arguments that point to various data input & output paths
+    """    
+    data_path: Union[str, Path] = field(
+        default=BASE_PATH / "input" / "data" / "data",
+        metadata={"help": "Actual root path of the data"},
+        )
+    train_path: Union[str, Path] = field(
+        default=data_path / "train_dataset",
+        metadata={"help": "Wrapper train data path containing metadata"},
+        )
+    train_data_path: Union[str, Path] = field(
+        default=train_path / "train",
+        metadata={"help": "Actual train data path containing pyarrow format data"}
+        )
+    val_data_path: Union[str, Path] = field(
+        default=train_path / "validation",
+        metadata={"help": "Actual validation(train) data path containing pyarrow format data"},
+        )
+    test_path: Union[str, Path] = field(
+        default=data_path / "test_dataset",
+        metadata={"help": "Wrapper test data path containing metadata"},
+        )
+    test_data_path: Union[str, Path] = field(
+        default=test_path / "validation",
+        metadata={"help": "Actual validation(test) data path containing pyarrow format data"},
+        )
 
 @dataclass
 class ModelArguments:
@@ -38,7 +57,7 @@ class DataTrainingArguments:
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
     dataset_name: Optional[str] = field(
-        default=train_path, metadata={"help": "The name of the dataset to use."}
+        default=PathArguments.train_path, metadata={"help": "The name of the dataset to use."}
     )
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}

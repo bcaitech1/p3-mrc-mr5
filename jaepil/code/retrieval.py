@@ -22,8 +22,10 @@ import os, sys
 from pathlib import Path
 from glob import glob
 
-BASE_PATH = Path('.').resolve().parent
-sys.path.append(BASE_PATH.as_posix())
+## Custom libraries
+from arguments import (
+    PathArguments,
+)
 
 @contextmanager
 def timer(name):
@@ -32,7 +34,7 @@ def timer(name):
     print(f'[{name}] done in {time.time() - t0:.3f} s')
 
 class SparseRetrieval:
-    def __init__(self, tokenize_fn, data_path="./data/", context_path="wikipedia_documents.json"):
+    def __init__(self, tokenize_fn, data_path=PathArguments.data_path, context_path="wikipedia_documents.json"):
         self.data_path = data_path
         with open(os.path.join(data_path, context_path), "r") as f:
             wiki = json.load(f)

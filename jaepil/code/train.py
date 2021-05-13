@@ -13,11 +13,13 @@ from transformers import (
     set_seed,
 )
 
+## Custom libraries
 from utils_qa import postprocess_qa_predictions, check_no_error, tokenize
 from trainer_qa import QuestionAnsweringTrainer
 from retrieval import SparseRetrieval
 
 from arguments import (
+    PathArguments,
     ModelArguments,
     DataTrainingArguments,
 )
@@ -83,7 +85,7 @@ def main():
 
 def run_sparse_embedding():
     retriever = SparseRetrieval(tokenize_fn=tokenize,
-                                data_path="./data",
+                                data_path=PathArguments.data_path,
                                 context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
 

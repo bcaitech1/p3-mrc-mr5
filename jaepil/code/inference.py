@@ -39,9 +39,9 @@ def main():
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
     parser = HfArgumentParser(
-        (PathArguments, ModelArguments, DataTrainingArguments, TrainingArguments)
+        (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
-    path_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.do_train = True
 
@@ -95,7 +95,7 @@ def run_sparse_retrieval(datasets, training_args):
     #### retreival process ####
 
     retriever = SparseRetrieval(tokenize_fn=tokenize,
-                                data_path=path_args.data_path,
+                                data_path=PathArguments.data_path,
                                 context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
     df = retriever.retrieve(datasets['validation'])

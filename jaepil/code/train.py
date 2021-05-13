@@ -32,9 +32,9 @@ def main():
 
     # CLI상에서 또는 default 값으로 정의된 Argument를 받아온다. 
     parser = HfArgumentParser(
-        (PathArguments, ModelArguments, DataTrainingArguments, TrainingArguments)
+        (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
-    path_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
@@ -85,7 +85,7 @@ def main():
 
 def run_sparse_embedding():
     retriever = SparseRetrieval(tokenize_fn=tokenize,
-                                data_path=path_args.data_path,
+                                data_path=PathArguments.data_path,
                                 context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
 

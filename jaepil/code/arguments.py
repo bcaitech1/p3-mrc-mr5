@@ -1,6 +1,10 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
+from transformers import (
+    TrainingArguments,
+)
+
 from pathlib import Path
 import sys
 
@@ -15,25 +19,55 @@ class PathArguments:
         metadata={"help": "Actual root path of the data"},
         )
     train_path: Union[str, Path] = field(
-        default=data_path / "train_dataset",
+        default=data_path.default / "train_dataset",
         metadata={"help": "Wrapper train data path containing metadata"},
         )
     train_data_path: Union[str, Path] = field(
-        default=train_path / "train",
+        default=train_path.default / "train",
         metadata={"help": "Actual train data path containing pyarrow format data"}
         )
     val_data_path: Union[str, Path] = field(
-        default=train_path / "validation",
+        default=train_path.default / "validation",
         metadata={"help": "Actual validation(train) data path containing pyarrow format data"},
         )
     test_path: Union[str, Path] = field(
-        default=data_path / "test_dataset",
+        default=data_path.default / "test_dataset",
         metadata={"help": "Wrapper test data path containing metadata"},
         )
     test_data_path: Union[str, Path] = field(
-        default=test_path / "validation",
+        default=test_path.default / "validation",
         metadata={"help": "Actual validation(test) data path containing pyarrow format data"},
         )
+    
+    output_path: Union[str, Path] = field(
+        default=BASE_PATH / "output",
+        metadata={"help": "Wrapper output data path containing train/test/models/processed directories"},
+    )
+    processed_path: Union[str, Path] = field(
+        default=output_path.default / "processed_data",
+        metadata={"help": "Temp directory to store processed data"},
+    )
+    train_output_path: Union[str, Path] = field(
+        default=output_path.default / "train_dataset",
+        metadata={"help": "Actual output(train) data path containing inference result"},
+    )
+    test_output_path: Union[str, Path] = field(
+        default=output_path.default / "test_dataset",
+        metadata={"help": "Actual output(test) data path containing inference result"},
+    )
+    model_output_path: Union[str, Path] = field(
+        default=output_path.default / "models" / "train_dataset",
+        metadata={"help": "Model output path containing trained models"},
+    )
+
+@dataclass
+class TrainingArguments(TrainingArguments):
+    """Inherits transformers.TrainingArguments to manage configs here
+    """    
+    output_dir: Union[str, Path] = field(
+        default=PathArguments.model_output_path,
+        metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
+    )
 
 @dataclass
 class ModelArguments:

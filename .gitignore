@@ -404,7 +404,7 @@ tags
 ### User-specific ignore ###
 jaepil/code/install/*
 jaepil/temp/*
-jaepil/input/processed_data/*
+jaepil/output/processed_data/*
 
 junseok/MRC_Baseline_Code/data/*
 junseok/MRC_Baseline_Code/result/*

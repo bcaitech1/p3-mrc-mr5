@@ -26,13 +26,13 @@ from arguments import (
 logger = logging.getLogger(__name__)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 def main():
-    wandb.init(
-        project="koelectra",
-        entity='roadv',
-        tags=["baseline", "test"],
-        group="electra"
-    )
-    config = wandb.config
+    # wandb.init(
+    #     project="koelectra",
+    #     entity='roadv',
+    #     tags=["baseline", "test"],
+    #     group="electra"
+    # )
+    # config = wandb.config
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.    
     parser = HfArgumentParser( # hint 만들어주는 것인듯?
@@ -50,19 +50,15 @@ def main():
     temp = temp.replace('/','_')
     output_dir= f'./result/{temp}{model_args.suffix}/'
     logging_dir= f'./logs/{temp}{model_args.suffix}/'
-    i = 0
-    while os.path.exists(training_args.output_dir):
-        training_args.output_dir= f'./result/{temp}{model_args.suffix}_{i}/'
-        training_args.logging_dir= f'./logs/{temp}{model_args.suffix}_{i}/'
-        i+=1
     training_args = TrainingArguments(
         output_dir=output_dir,           # output directory
         save_total_limit=1,              # number of total save model.
-        save_steps=500,                  # model saving step.
+        # save_steps=500,                  # model saving step.
         num_train_epochs=5,              # total number of training epochs
-        learning_rate=5e-5,              # learning_rate
-        per_device_train_batch_size=32,  # batch size per device during training
-        per_device_eval_batch_size=32,   # batch size for evaluation
+        learning_rate=1e-6,              # learning_rate
+        # learning_rate=1e-5,
+        per_device_train_batch_size=16,  # batch size per device during training
+        per_device_eval_batch_size=16,   # batch size for evaluation
         warmup_steps=500,                # number of warmup steps for learning rate scheduler
         weight_decay=0.01,               # strength of weight decay
         logging_dir=logging_dir,            # directory for storing logs
@@ -81,9 +77,13 @@ def main():
         do_train=True,
         do_eval=True,
         seed=42,
-        report_to="wandb",
-        run_name=f"{temp}{model_args.suffix}_{i}",
     )
+    i = 0
+    while os.path.exists(training_args.output_dir):
+        training_args.output_dir= f'./result/{temp}{model_args.suffix}_{i}/'
+        training_args.logging_dir= f'./logs/{temp}{model_args.suffix}_{i}/'
+        i+=1
+    
 
     print(f"training Data : {training_args}")
     print(f"model Data : {model_args}")
@@ -412,4 +412,4 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
 if __name__ == "__main__":
     # wandb.login()
     main()
-    wandb.finish()
+    # wandb.finish()

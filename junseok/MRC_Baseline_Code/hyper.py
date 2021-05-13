@@ -56,7 +56,9 @@ def main():
         # "num_train_epochs":train_args.num_train_epochs,              # total number of training epochs
         # "learning_rate":train_args.learning_rate,              # learning_rate
         # "per_device_train_batch_size":train_args.per_device_train_batch_size,  # batch size per device during training
-        # "per_device_eval_batch_size":train_args.per_device_train_batch_size,   # batch size for evaluation
+        "per_device_eval_batch_size":train_args.per_device_train_batch_size,   # batch size for evaluation
+        # "per_device_train_batch_size":2,  # batch size per device during training
+        # "per_device_eval_batch_size":2,   # batch size for evaluation
         "warmup_steps":500,                # number of warmup steps for learning rate scheduler
         "weight_decay":0.01,               # strength of weight decay
         "logging_dir":logging_dir,            # directory for storing logs
@@ -92,7 +94,7 @@ def main():
     training_args = TrainingArguments(
         **config
     )
-
+    print(config)
     i = 0
     while os.path.exists(training_args.output_dir):
         training_args.output_dir= f'./result/{temp}{model_args.suffix}_{i}/'
@@ -100,8 +102,11 @@ def main():
         i+=1
 
     print(f"training Data : {training_args}")
+    print("")
     print(f"model Data : {model_args}")
+    print("")
     print(f"data : {data_args}")
+    print("")
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",

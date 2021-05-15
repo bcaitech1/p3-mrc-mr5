@@ -387,16 +387,19 @@ tags
 .vscode-server/
 .local/
 .cache/
-
 .conda/
 .bash_history
 .jupyter/
 .python_history
 .viminfo
+.config/
 
 ## Credentials
 .git-credentials
 .gitconfig
+
+## WandB
+.netrc
 
 ## Misk
 .pororo/*
@@ -404,7 +407,9 @@ tags
 ### User-specific ignore ###
 jaepil/code/install/*
 jaepil/temp/*
-jaepil/input/processed_data/*
+jaepil/output/*
+jaepil/code/wandb/*
+jaepil/code/runs
 
 junseok/MRC_Baseline_Code/data/*
 junseok/MRC_Baseline_Code/result/*

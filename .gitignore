@@ -409,3 +409,4 @@ jaepil/input/processed_data/*
 junseok/MRC_Baseline_Code/data/*
 junseok/MRC_Baseline_Code/result/*
 junseok/MRC_Baseline_Code/submit/*
+junseok/MRC_Baseline_Code/wandb/*

@@ -4,7 +4,7 @@ import sys
 from datasets import load_metric, load_from_disk
 
 from transformers import AutoConfig, AutoModelForQuestionAnswering, AutoTokenizer
-from kobert_tokenizer import KoBertTokenizer
+# from kobert_tokenizer import KoBertTokenizer
 from transformers import (
     DataCollatorWithPadding,
     EvalPrediction,
@@ -43,10 +43,11 @@ def main():
 
     temp = model_args.model_name_or_path
     if temp==None:
-        temp = model_args.model_name_or_path = "monologg/koelectra-base-v3-finetuned-korquad"
+        temp = model_args.model_name_or_path = "hanmaroo/xlm_roberta_large_korquad_v2"
         # monologg/koelectra-base-v3-finetuned-korquad 
         # sangrimlee/bert-base-multilingual-cased-korquad
         # xlm-roberta-base
+        # hanmaroo/xlm_roberta_large_korquad_v2
     temp = temp.replace('/','_')
     output_dir= f'./result/{temp}{model_args.suffix}/'
     logging_dir= f'./logs/{temp}{model_args.suffix}/'
@@ -54,11 +55,11 @@ def main():
         output_dir=output_dir,           # output directory
         save_total_limit=1,              # number of total save model.
         # save_steps=500,                  # model saving step.
-        num_train_epochs=5,              # total number of training epochs
-        learning_rate=1e-6,              # learning_rate
-        # learning_rate=1e-5,
-        per_device_train_batch_size=16,  # batch size per device during training
-        per_device_eval_batch_size=16,   # batch size for evaluation
+        num_train_epochs=7,              # total number of training epochs
+        # learning_rate=1e-6,              # learning_rate
+        learning_rate=8e-5,
+        per_device_train_batch_size=8,  # batch size per device during training
+        per_device_eval_batch_size=8,   # batch size for evaluation
         warmup_steps=500,                # number of warmup steps for learning rate scheduler
         weight_decay=0.01,               # strength of weight decay
         logging_dir=logging_dir,            # directory for storing logs
@@ -67,7 +68,7 @@ def main():
                                     # `no`: No evaluation during training.
                                     # `steps`: Evaluate every `eval_steps`.
                                     # `epoch`: Evaluate every end of epoch.
-        eval_steps = 300,           # evaluation step.
+        eval_steps = 1200,           # evaluation step.
         dataloader_num_workers=4,
         load_best_model_at_end=True, # save_strategy, save_steps will be ignored
         metric_for_best_model="exact_match", # eval_accuracy

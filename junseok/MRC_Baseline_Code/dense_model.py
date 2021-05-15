@@ -1,66 +1,154 @@
-# google drive 에 올려둔 미리 학습해둔 인코더 불러오기
-from datasets import load_dataset
-from transformers import BertModel, BertPreTrainedModel, BertConfig, AutoTokenizer
+from datasets import load_dataset, load_from_disk
+from transformers import AutoTokenizer
+import numpy as np
+from tqdm import tqdm, trange
+import argparse
+import random
+import torch
+import torch.nn.functional as F
+from transformers import BertModel, BertPreTrainedModel, AdamW, TrainingArguments, get_linear_schedule_with_warmup
+from torch.utils.data import (DataLoader, RandomSampler, TensorDataset)
+import os
+
+def set_seed(seed: int):
+    """
+    Helper function for reproducible behavior to set the seed in ``random``, ``numpy``, ``torch`` and/or ``tf`` (if
+    installed).
+
+    Args:
+        seed (:obj:`int`): The seed to set.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if use multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+set_seed(2021)
+def train(args, dataset, p_model, q_model):
+  
+  # Dataloader
+  train_sampler = RandomSampler(dataset)
+  train_dataloader = DataLoader(dataset, sampler=train_sampler, batch_size=args.per_device_train_batch_size)
+
+  t_total = len(train_dataloader) // args.gradient_accumulation_steps * args.num_train_epochs
+  optimizer = AdamW([
+                {'params': p_model.parameters()},
+                {'params': q_model.parameters()}
+            ], lr=args.learning_rate, weight_decay=args.weight_decay)
+  scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total)
+
+  # Start training!
+  global_step = 0
+  
+  p_model.zero_grad()
+  q_model.zero_grad()
+  torch.cuda.empty_cache()
+  
+  train_iterator = trange(int(args.num_train_epochs), desc="Epoch")
+
+  for _ in train_iterator:
+    epoch_iterator = tqdm(train_dataloader, desc="Iteration")
+
+    for step, batch in enumerate(epoch_iterator):
+      q_encoder.train()
+      p_encoder.train()
+      
+      if torch.cuda.is_available():
+        batch = tuple(t.cuda() for t in batch)
+
+      p_inputs = {'input_ids': batch[0],
+                  'attention_mask': batch[1],
+                  'token_type_ids': batch[2]
+                  }
+      
+      q_inputs = {'input_ids': batch[3],
+                  'attention_mask': batch[4],
+                  'token_type_ids': batch[5]}
+      
+      p_outputs = p_model(**p_inputs)  # (batch_size, emb_dim)
+      q_outputs = q_model(**q_inputs)  # (batch_size, emb_dim)
 
 
-class BertEncoder(BertPreTrainedModel):
-    def __init__(self, config):
-        super(BertEncoder, self).__init__(config)
+      # Calculate similarity score & loss
+      sim_scores = torch.matmul(q_outputs, torch.transpose(p_outputs, 0, 1))  # (batch_size, emb_dim) x (emb_dim, batch_size) = (batch_size, batch_size)
 
-        self.bert = BertModel(config)
-        self.init_weights()
+      # target: position of positive samples = diagonal element 
+      targets = torch.arange(0, args.per_device_train_batch_size).long()
+      if torch.cuda.is_available():
+        targets = targets.to('cuda')
 
-    def forward(self, input_ids,
-                attention_mask=None, token_type_ids=None):
+      sim_scores = F.log_softmax(sim_scores, dim=1)
 
-        outputs = self.bert(input_ids,
-                            attention_mask=attention_mask,
-                            token_type_ids=token_type_ids)
+      loss = F.nll_loss(sim_scores, targets)
+      print(loss)
 
-        pooled_output = outputs[1]
-
-        return pooled_output
-
-
-model_checkpoint = "bert-base-multilingual-cased"
-p_encoder = BertEncoder.from_pretrained(model_checkpoint).cuda()
-q_encoder = BertEncoder.from_pretrained(model_checkpoint).cuda()
-model_dict = torch.load("./dense_encoder/encoder.pth")
-p_encoder.load_state_dict(model_dict['p_encoder'])
-q_encoder.load_state_dict(model_dict['q_encoder'])
-
-tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-
-dataset = load_dataset("squad_kor_v1")
-
+      loss.backward()
+      optimizer.step()
+      scheduler.step()
+      q_model.zero_grad()
+      p_model.zero_grad()
+      global_step += 1
+      
+      torch.cuda.empty_cache()
+    
+  return p_model, q_model
 
 def to_cuda(batch):
-    return tuple(t.cuda() for t in batch)
+  return tuple(t.cuda() for t in batch)
 
-def get_relevant_doc(p_encoder, q_encoder, query, k=1):
-    with torch.no_grad():
-        p_encoder.eval()
-        q_encoder.eval()
+class BertEncoder(BertPreTrainedModel):
+  def __init__(self, config):
+    super(BertEncoder, self).__init__(config)
 
-        q_seqs_val = tokenizer(
-            [query], padding="max_length", truncation=True, return_tensors='pt').to('cuda')
-        q_emb = q_encoder(**q_seqs_val).to('cpu')  # (num_query, emb_dim)
+    self.bert = BertModel(config)
+    self.init_weights()
+      
+  def forward(self, input_ids, 
+              attention_mask=None, token_type_ids=None): 
+  
+      outputs = self.bert(input_ids,
+                          attention_mask=attention_mask,
+                          token_type_ids=token_type_ids)
+      
+      pooled_output = outputs[1]
 
-        p_embs = []
-        for p in valid_corpus:
-            p = tokenizer(p, padding="max_length",
-                            truncation=True, return_tensors='pt').to('cuda')
-            p_emb = p_encoder(**p).to('cpu').numpy()
-            p_embs.append(p_emb)
+      return pooled_output
 
-    p_embs = torch.Tensor(p_embs).squeeze()  # (num_passage, emb_dim)
-    dot_prod_scores = torch.matmul(q_emb, torch.transpose(p_embs, 0, 1))
+model_checkpoint = "bert-base-multilingual-cased"
 
-    rank = torch.argsort(dot_prod_scores, dim=1, descending=True).squeeze()
+tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+path = './drive/MyDrive/Colab Notebooks/MRC/train_dataset/train'
+print(os.listdir(path))
+training_dataset = load_from_disk(path)
+q_seqs = tokenizer(training_dataset['question'], padding="max_length", truncation=True, return_tensors='pt')
+p_seqs = tokenizer(training_dataset['context'], padding="max_length", truncation=True, return_tensors='pt')
 
-    return dot_prod_scores.squeeze(), rank[:k]
+train_dataset = TensorDataset(p_seqs['input_ids'], p_seqs['attention_mask'], p_seqs['token_type_ids'], 
+                        q_seqs['input_ids'], q_seqs['attention_mask'], q_seqs['token_type_ids'])
 
-random.seed(2020)
+# load pre-trained model on cuda (if available)
+p_encoder = BertEncoder.from_pretrained(model_checkpoint)
+q_encoder = BertEncoder.from_pretrained(model_checkpoint)
+
+if torch.cuda.is_available():
+  p_encoder.cuda()
+  q_encoder.cuda()
+
+args = TrainingArguments(
+    output_dir="./dense/",
+    evaluation_strategy="epoch",
+    learning_rate=2e-5,
+    per_device_train_batch_size=4,
+    per_device_eval_batch_size=4,
+    num_train_epochs=3,
+    weight_decay=0.01
+)
+
+p_encoder, q_encoder = train(args, train_dataset, p_encoder, q_encoder)
+
 valid_corpus = list(set([example['context'] for example in dataset['validation']]))[:10]
 sample_idx = random.choice(range(len(dataset['validation'])))
 query = dataset['validation'][sample_idx]['question']
@@ -69,25 +157,10 @@ ground_truth = dataset['validation'][sample_idx]['context']
 if not ground_truth in valid_corpus:
   valid_corpus.append(ground_truth)
 
-print("{} {} {}".format('*'*20, 'Ground Truth','*'*20))
-print("[Search query]\n", query, "\n")
-pprint(ground_truth, compact=True)
+print(query)
+print(ground_truth, '\n\n')
 
 # valid_corpus
 
-_, doc_id = get_relevant_doc(p_encoder, q_encoder, query, k=1)
-
-""" 상위 1개 문서를 추출했을 때 결과 확인 """
-print("{} {} {}".format('*'*20, 'Result','*'*20))
-print("[Search query]\n", query, "\n")
-print(f"[Relevant Doc ID(Top 1 passage)]: {doc_id}")
-print(valid_corpus[doc_id.item()])
-# print(answer)
-
-""" 상위 5개를 추출하여 점수 확인 """
-dot_prod_scores, rank = get_relevant_doc(p_encoder, q_encoder, query, k=5)
-
-for i in range(5):
-    print(rank[i])
-    print("Top-%d passage with score %.4f" % (i+1, dot_prod_scores.squeeze()[rank[i]]))
-    print(valid_corpus[rank[i]])
+if __name__ == "__main__":
+    main()

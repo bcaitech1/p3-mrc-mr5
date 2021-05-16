@@ -1,0 +1,31 @@
+{
+    "os": "Linux-4.4.0-59-generic-x86_64-with-debian-buster-sid",
+    "python": "3.7.7",
+    "heartbeatAt": "2021-05-16T12:51:35.901412",
+    "startedAt": "2021-05-16T12:51:34.496687",
+    "docker": null,
+    "gpu": "Tesla P40",
+    "gpu_count": 1,
+    "cpu_count": 4,
+    "cuda": null,
+    "args": [
+        "--model_dir_or_name",
+        "monologg/koelectra-base-v3-finetuned-korquad",
+        "--suffix",
+        "test",
+        "--data_dir",
+        "./data/KLUQUAD"
+    ],
+    "state": "running",
+    "program": "train_reader.py",
+    "codePath": "junseok/MRC_Baseline_Code/Baseline_for_EB_ODQA/train_reader.py",
+    "git": {
+        "remote": "https://github.com/bcaitech1/p3-mrc-mr5.git",
+        "commit": "0af896f23c2756f878511c1e3d7074b4fb154232"
+    },
+    "email": "roadvirushn@gmail.com",
+    "root": "/opt/ml/MyCode/p3-mrc-mr5",
+    "host": "fbe1f2451177",
+    "username": "root",
+    "executable": "/opt/conda/bin/python"
+}

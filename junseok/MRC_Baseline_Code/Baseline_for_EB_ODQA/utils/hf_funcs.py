@@ -16,6 +16,20 @@
 Pre-processing
 Post-processing utilities for question answering.
 """
+"""
+A subclass of `Trainer` specific to Question-Answering tasks
+"""
+
+from transformers import Trainer, is_datasets_available, is_torch_tpu_available
+# from transformers.trainer_utils import PredictionOutput
+
+if is_datasets_available():
+    import datasets
+
+if is_torch_tpu_available():
+    import torch_xla.core.xla_model as xm
+    import torch_xla.debug.metrics as met
+
 import collections
 import json
 import logging
@@ -34,9 +48,95 @@ from transformers.trainer_utils import get_last_checkpoint
 logger = logging.getLogger(__name__)
 
 mecab = Mecab()
-# print(mecab.morphs("베피콜롬보는 수성 탐사 계획 중 하나로 ESA와 JAXA가 공동으로 계획했다. 소형 탐사선 2기를 보유하고 있으며, 유럽(MPO)과 일본MMO)에서 각각 한 기씩 제공했으며, 또한 한 기는 사진을 찍고, 다른 한 기는 자기장을 연구하는 등 역할이 확실히 구별되어 있다. 태양 성운, 행성계에 있어서, 수성에 대해 연구해야 할 것은 무엇인가? 왜 수성의 밀도는 다른 지구형 행성보다 높은가? 수성의 핵은 액체인가? 고체인가? 오늘날도 수성 구조는 활동적인가? 금성과 화성, 달도 가지고 있지 못 한 작은 행성이 왜 자기장을 가지고 있는가? 수성의 주 성분이 철임에도, 분광 관측으로는 발견되지 않았던 이유는 무엇인가? 극점의 영구 동토에는 황 혹은 얼음이 존재하는가? 외기권의 형성 원리는 무엇인가? 이온층이 없는데도, 자기장과 태양풍이 어떻게 상호 작용을 하는가? 수성의 자화(磁化)된 환경이 지구에서 관측되는 오로라, 밴 앨랜대, 자기 폭풍 등이 존재한다는 것을 암시하는가? 공간의 왜곡으로 인한 수성의 근일점 변화가 일반상대성이론에 근거한 결과의 오차값을 더 줄일 수 있는가? 매리너 10호나 메신저와 같이, 베피콜롬보는 금성과 지구에서 플라이바이를 사용할 예정이다. 특히, 태양 에너지 추진을 이용하여 달, 금성을 지나 수성에 느린 속도로 도달 할 전망이다. 이런 기술은 태양 중력의 영향을 최소화하여 수성에 접근하기 위해서는 필수적이다. 베피콜롬보는 2018년 10월 경에 발사 되어, 2025년 12월 5일, 수성 궤도로 진입 할 예정이다. 그 후, 2년동안 수성에 대한 정보를 모으고 연구를 행할 것이다."))
+
+class QuestionAnsweringTrainer(Trainer):
+    def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.eval_examples = eval_examples
+        self.post_process_function = post_process_function
+
+    def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None):
+        eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
+        eval_dataloader = self.get_eval_dataloader(eval_dataset)
+        eval_examples = self.eval_examples if eval_examples is None else eval_examples
+
+        # Temporarily disable metric computation, we will do it in the loop here.
+        compute_metrics = self.compute_metrics
+        self.compute_metrics = None
+        try:
+            output = self.prediction_loop(
+                eval_dataloader,
+                description="Evaluation",
+                # No point gathering the predictions if there are no metrics, otherwise we defer to
+                # self.args.prediction_loss_only
+                prediction_loss_only=True if compute_metrics is None else None,
+                ignore_keys=ignore_keys,
+            )
+        finally:
+            self.compute_metrics = compute_metrics
+
+        # We might have removed columns from the dataset so we put them back.
+        if isinstance(eval_dataset, datasets.Dataset):
+            eval_dataset.set_format(
+                type=eval_dataset.format["type"],
+                columns=list(eval_dataset.features.keys()),
+            )
+
+        if self.post_process_function is not None and self.compute_metrics is not None:
+            eval_preds = self.post_process_function(
+                eval_examples, eval_dataset, output.predictions, self.args
+            )
+            metrics = self.compute_metrics(eval_preds)
+
+            self.log(metrics)
+        else:
+            metrics = {}
+
+        if self.args.tpu_metrics_debug or self.args.debug:
+            # tpu-comment: Logging debug metrics for PyTorch/XLA (compile, execute times, ops, etc.)
+            xm.master_print(met.metrics_report())
+
+        self.control = self.callback_handler.on_evaluate(
+            self.args, self.state, self.control, metrics
+        )
+        return metrics
+
+    def predict(self, test_dataset, test_examples, ignore_keys=None):
+        test_dataloader = self.get_test_dataloader(test_dataset)
+
+        # Temporarily disable metric computation, we will do it in the loop here.
+        compute_metrics = self.compute_metrics
+        self.compute_metrics = None
+        try:
+            output = self.prediction_loop(
+                test_dataloader,
+                description="Evaluation",
+                # No point gathering the predictions if there are no metrics, otherwise we defer to
+                # self.args.prediction_loss_only
+                prediction_loss_only=True if compute_metrics is None else None,
+                ignore_keys=ignore_keys,
+            )
+        finally:
+            self.compute_metrics = compute_metrics
+
+        if self.post_process_function is None or self.compute_metrics is None:
+            return output
+
+        # We might have removed columns from the dataset so we put them back.
+        if isinstance(test_dataset, datasets.Dataset):
+            test_dataset.set_format(
+                type=test_dataset.format["type"],
+                columns=list(test_dataset.features.keys()),
+            )
+
+        predictions = self.post_process_function(
+            test_examples, test_dataset, output.predictions, self.args
+        )
+        return predictions
+
+
+
 def tokenize(text):
-    # return text.split(" ")
     return mecab.morphs(text)
 
 def set_seed(seed: int):
@@ -316,13 +416,11 @@ def postprocess_qa_predictions(
     return all_predictions
 
 
-def check_no_error(training_args, data_args, tokenizer, datasets):
+def check_no_error(training_args, token_args, tokenizer, datasets):
     # Detecting last checkpoint.
     last_checkpoint = None
     if (
             os.path.isdir(training_args.output_dir)
-            and training_args.do_train
-            and not training_args.overwrite_output_dir
     ):
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
@@ -344,12 +442,12 @@ def check_no_error(training_args, data_args, tokenizer, datasets):
             "requirement"
         )
 
-    if data_args.max_seq_length > tokenizer.model_max_length:
+    if token_args.max_seq_length > tokenizer.model_max_length:
         logger.warn(
-            f"The max_seq_length passed ({data_args.max_seq_length}) is larger than the maximum length for the"
+            f"The max_seq_length passed ({token_args.max_seq_length}) is larger than the maximum length for the"
             f"model ({tokenizer.model_max_length}). Using max_seq_length={tokenizer.model_max_length}."
         )
-    max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
+    max_seq_length = min(token_args.max_seq_length, tokenizer.model_max_length)
 
     if "validation" not in datasets:
         raise ValueError("--do_eval requires a validation dataset")

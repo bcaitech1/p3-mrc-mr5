@@ -530,22 +530,26 @@ class SparseRetrieval_BM25PLUS:
             # make retrieved result as dataframe
             total = []
             with timer("query exhaustive search"):
-                doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'], topk)
+                doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'][:5], topk)
             for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
                 # relev_doc_ids = [el for i, el in enumerate(self.ids) if i in doc_indices[idx]]
+                test = ', '.join(map(str,doc_indices[idx]))
                 tmp = {
                     "question": example["question"],
                     "id": example['id'],
-                    "context_id": doc_indices[idx][0],  # retrieved id
-                    "context": self.contexts[doc_indices[idx][0]]  # retrieved doument
+                    "context_ids": test,  # retrieved id
+                    # "contexts": [self.contexts[i] for i in doc_indices[idx]]  # retrieved doument
                 }
                 if 'context' in example.keys() and 'answers' in example.keys():
                     tmp["original_context"] = example['context']  # original document
                     tmp["answers"] = example['answers']           # original answer
+                    tmp["original_index"] = str(self.contexts.index(tmp["original_context"]))
                 total.append(tmp)
-
-            cqas = pd.DataFrame(total)
-            return cqas
+                if idx == 4:
+                    break
+            return total
+            # cqas = pd.DataFrame(total)
+            # return cqas
 
     def get_relevant_doc(self, query, k=1):
         result = self.bm25.get_scores(self.tokenize_fn(query))
@@ -572,7 +576,7 @@ class SparseRetrieval_BM25PLUS:
 if __name__ == "__main__":
     # Test sparse
     
-    org_dataset = load_from_disk("./data/train_dataset")
+    org_dataset = load_from_disk("./data/dummy_dataset")
     full_ds = concatenate_datasets(
         [
             org_dataset["train"].flatten_indices(),
@@ -622,15 +626,17 @@ if __name__ == "__main__":
     query = "대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?"
     
     # query = "다키스트 던전을 개발한 게임사 이름은?"
-    with timer("single query by exhaustive search"):
-        scores, indices = retriever.retrieve(query)
+    # with timer("single query by exhaustive search"):
+    #     scores, indices = retriever.retrieve(query)
     # with timer("single query by faiss"):
     #     scores, indices = retriever.retrieve_faiss(query)
 
     # test bulk
     with timer("bulk query by exhaustive search"):
         df = retriever.retrieve(full_ds, 5)
-        df['correct'] = df['original_context'] == df['context']
+        # df['context_ids'] = df['context_ids'].astype("|S")
+        # df['original_index'] = df['original_index'].astype("|S")
+        # df['correct'] = df[df['original_index'] in df['context_ids']] 
         print("correct retrieval result by exhaustive search", df['correct'].sum() / len(df))
     # with timer("bulk query by exhaustive search"):
     #     df = retriever.retrieve_faiss(full_ds)

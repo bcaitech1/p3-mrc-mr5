@@ -515,6 +515,39 @@ class SparseRetrieval_BM25PLUS:
     #     self.indexer.train(p_emb)
     #     self.indexer.add(p_emb)
 
+    def retrieve_for_eval(self, query_or_dataset, topk=1):
+        assert self.bm25 is not None, "You must build faiss by self.get_sparse_embedding() before you run self.retrieve()."
+        if isinstance(query_or_dataset, str):
+            doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
+            print("[Search query]\n", query_or_dataset, "\n")
+
+            for i in range(topk):
+                print("Top-%d passage with score %.4f" % (i + 1, doc_scores[i]))
+                print(self.contexts[doc_indices[i]])
+            return doc_scores, [self.contexts[doc_indices[i]] for i in range(topk)]
+
+        elif isinstance(query_or_dataset, Dataset):
+            # make retrieved result as dataframe
+            total = []
+            with timer("query exhaustive search"):
+                doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'], topk)
+            for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
+                # relev_doc_ids = [el for i, el in enumerate(self.ids) if i in doc_indices[idx]]
+                tmp = {
+                    "question": example["question"],
+                    "id": example['id'],
+                    # "context_ids":  doc_indices[idx][0],  # retrieved id
+                    # "contexts": self.contexts[doc_indices[idx][0]]  # retrieved doument
+                }
+                if 'context' in example.keys() and 'answers' in example.keys():
+                    tmp["original_context"] = example['context']  # original document
+                    tmp["answers"] = example['answers']           # original answer
+                    tmp["correct"] = self.contexts.index(tmp["original_context"]) in doc_indices[idx]
+                total.append(tmp)
+            # return total
+            cqas = pd.DataFrame(total)
+            return cqas
+
     def retrieve(self, query_or_dataset, topk=1):
         assert self.bm25 is not None, "You must build faiss by self.get_sparse_embedding() before you run self.retrieve()."
         if isinstance(query_or_dataset, str):
@@ -530,26 +563,19 @@ class SparseRetrieval_BM25PLUS:
             # make retrieved result as dataframe
             total = []
             with timer("query exhaustive search"):
-                doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'][:5], topk)
+                doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'], topk)
             for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
                 # relev_doc_ids = [el for i, el in enumerate(self.ids) if i in doc_indices[idx]]
-                test = ', '.join(map(str,doc_indices[idx]))
                 tmp = {
                     "question": example["question"],
                     "id": example['id'],
-                    "context_ids": test,  # retrieved id
-                    # "contexts": [self.contexts[i] for i in doc_indices[idx]]  # retrieved doument
-                }
-                if 'context' in example.keys() and 'answers' in example.keys():
-                    tmp["original_context"] = example['context']  # original document
-                    tmp["answers"] = example['answers']           # original answer
-                    tmp["original_index"] = str(self.contexts.index(tmp["original_context"]))
+                    # "context_ids": doc_indices[idx],  # retrieved id
+                    "contexts": '\n'.join([self.contexts[i] for i in doc_indices[idx]])  # retrieved doument
+                }         
                 total.append(tmp)
-                if idx == 4:
-                    break
-            return total
-            # cqas = pd.DataFrame(total)
-            # return cqas
+            # return total
+            cqas = pd.DataFrame(total)
+            return cqas
 
     def get_relevant_doc(self, query, k=1):
         result = self.bm25.get_scores(self.tokenize_fn(query))
@@ -577,6 +603,7 @@ if __name__ == "__main__":
     # Test sparse
     
     org_dataset = load_from_disk("./data/dummy_dataset")
+    # org_dataset = load_from_disk("./data/train_dataset")
     full_ds = concatenate_datasets(
         [
             org_dataset["train"].flatten_indices(),
@@ -627,15 +654,13 @@ if __name__ == "__main__":
     
     # query = "다키스트 던전을 개발한 게임사 이름은?"
     # with timer("single query by exhaustive search"):
-    #     scores, indices = retriever.retrieve(query)
+    #     scores, indices = retriever.retrieve_for_eval(query)
     # with timer("single query by faiss"):
     #     scores, indices = retriever.retrieve_faiss(query)
 
     # test bulk
     with timer("bulk query by exhaustive search"):
-        df = retriever.retrieve(full_ds, 5)
-        # df['context_ids'] = df['context_ids'].astype("|S")
-        # df['original_index'] = df['original_index'].astype("|S")
+        df = retriever.retrieve_for_eval(full_ds, 3)
         # df['correct'] = df[df['original_index'] in df['context_ids']] 
         print("correct retrieval result by exhaustive search", df['correct'].sum() / len(df))
     # with timer("bulk query by exhaustive search"):

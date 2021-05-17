@@ -39,6 +39,7 @@ def tokenize(text):
     # return text.split(" ")
     return mecab.morphs(text)
 
+
 def set_seed(seed: int):
     """
     Helper function for reproducible behavior to set the seed in ``random``, ``numpy``, ``torch`` and/or ``tf`` (if
@@ -221,7 +222,7 @@ def postprocess_qa_predictions(
             predictions.append(min_null_prediction)
 
         # Use the offsets to gather the answer text in the original context.
-        context = example["context"]
+        context = example["contexts"]
         for pred in predictions:
             offsets = pred.pop("offsets")
             pred["text"] = context[offsets[0] : offsets[1]]

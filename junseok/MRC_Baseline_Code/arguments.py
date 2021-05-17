@@ -8,7 +8,11 @@ class InferencelArguments:
     """
     retrieval: str = field(
         default=None,
-        metadata={"help": "retrieval method for retrieval step(default: TF-IDF Sparse)"}
+        metadata={"help": "retrieval method for retrieval step(default: BM25plus)"}
+    )
+    k: int = field(
+        default=5,
+        metadata={"help": "top-k score paragrph number(default: 5)"}
     )
 @dataclass
 class TrainArguments:

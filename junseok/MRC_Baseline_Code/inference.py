@@ -7,10 +7,9 @@ Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
 import logging
 import os
 import sys
-from datasets import load_metric, load_from_disk, Sequence, Value, Features, Dataset, DatasetDict
+from datasets import load_metric, load_from_disk, Sequence, Value, Features, Dataset, DatasetDict, DatasetBuilder
 
 from transformers import AutoConfig, AutoModelForQuestionAnswering, AutoTokenizer
-from kobert_tokenizer import KoBertTokenizer
 from transformers import (
     DataCollatorWithPadding,
     EvalPrediction,
@@ -18,7 +17,6 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
-
 from utils_qa import postprocess_qa_predictions, check_no_error, tokenize
 from trainer_qa import QuestionAnsweringTrainer
 from retrieval import SparseRetrieval, SparseRetrieval_BM25, SparseRetrieval_BM25PLUS
@@ -29,62 +27,49 @@ from arguments import (
     InferencelArguments
 )
 
+import json
+
 logger = logging.getLogger(__name__)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-def get_recent_model():
-    models_dir = './result'
-    all_models = [models_dir+'/'+d for d in os.listdir(models_dir) if os.path.isdir(models_dir+'/'+d)]
+
+def get_recent_model(models_dir='./result'):
+    all_models = [
+        models_dir+'/'+d for d in os.listdir(models_dir) if os.path.isdir(models_dir+'/'+d)]
     latest_models = max(all_models, key=os.path.getmtime)
-    all_checkpoints = [latest_models+'/'+d for d in os.listdir(latest_models) if os.path.isdir(latest_models+'/'+d)]
+    all_checkpoints = [latest_models+'/'+d for d in os.listdir(
+        latest_models) if os.path.isdir(latest_models+'/'+d)]
     latest_checkpoints = max(all_checkpoints, key=os.path.getmtime)
     return latest_models.replace(models_dir+'/', ''), latest_checkpoints
 
 
-def main(model_args, data_args, inf_args):    
+def main(model_args, data_args, inf_args):
+    # model_name = model_args.model_name_or_path = './result/monologg_koelectra-base-v3-finetuned-korquad/checkpoint-900'
     model_name = model_args.model_name_or_path
-    if model_name==None:
-        model_name, model_args.model_name_or_path = get_recent_model()
+    if model_name == None:
+        model_name, model_args.model_name_or_path = get_recent_model(
+            './Baseline_for_EB_ODQA/checkpoints')
+        # model_name, model_args.model_name_or_path = get_recent_model('./Baseline_for_EB_ODQA/checkpoints')
     else:
-        model_name = model_name.replace('/','_')
-    output_dir= f'./submit/{model_name}{model_args.suffix}/'
-    logging_dir= f'./logs/{model_name}{model_args.suffix}/'
+        model_name = model_name.replace('/', '_')
+    output_dir = f'./submit/{model_name}{model_args.suffix}/'
+    logging_dir = f'./logs/{model_name}{model_args.suffix}/'
     training_args = TrainingArguments(
         output_dir=output_dir,          # output directory
-        save_total_limit=2,              # number of total save model.
-        save_steps=500,                 # model saving step.
-        num_train_epochs=5,              # total number of training epochs
-        learning_rate=5e-5,               # learning_rate
-        per_device_train_batch_size=16,  # batch size per device during training
-        per_device_eval_batch_size=16,   # batch size for evaluation
-        warmup_steps=500,                # number of warmup steps for learning rate scheduler
-        weight_decay=0.01,               # strength of weight decay
-        logging_dir=logging_dir,            # directory for storing logs
-        logging_steps=100,              # log saving step.
-        evaluation_strategy='steps', # evaluation strategy to adopt during training
-                                    # `no`: No evaluation during training.
-                                    # `steps`: Evaluate every `eval_steps`.
-                                    # `epoch`: Evaluate every end of epoch.
-        eval_steps = 300,            # evaluation step.
-        dataloader_num_workers=4,
-        label_smoothing_factor=0.5,
-        load_best_model_at_end=True, # save_strategy, save_steps will be ignored
-        metric_for_best_model="exact_match", # eval_accuracy
-        greater_is_better=True, # set True if metric isn't loss
-        do_train=True,
         do_predict=True,
         seed=42,
     )
     i = 0
     while os.path.exists(training_args.output_dir):
-        training_args.output_dir= f'./result/{model_name}{model_args.suffix}_{i}/'
-        training_args.logging_dir= f'./logs/{model_name}{model_args.suffix}_{i}/'
-        i+=1
+        training_args.output_dir = f'./result/{model_name}{model_args.suffix}_{i}/'
+        training_args.logging_dir = f'./logs/{model_name}{model_args.suffix}_{i}/'
+        i += 1
 
     print(f"training Data : {training_args}")
     print(f"model Data : {model_args}")
     print(f"data : {data_args}")
+    print(f"inference setting : {inf_args}")
 
     # Setup logging
     logging.basicConfig(
@@ -109,21 +94,21 @@ def main(model_args, data_args, inf_args):
         if model_args.config_name
         else model_args.model_name_or_path,
     )
-    if "ko" in model_args.model_name_or_path and "bert" in model_args.model_name_or_path:
-        print(f"using korean tokenizer for {model_name}")
-        tokenizer = KoBertTokenizer.from_pretrained(
-            model_args.tokenizer_name
-            if model_args.tokenizer_name
-            else model_args.model_name_or_path,
-            use_fast=True
-        )
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_args.tokenizer_name
-            if model_args.tokenizer_name
-            else model_args.model_name_or_path,
-            use_fast=True,
-        )
+    # if "ko" in model_args.model_name_or_path and "bert" in model_args.model_name_or_path:
+    #     print(f"using korean tokenizer for {model_name}")
+    #     tokenizer = KoBertTokenizer.from_pretrained(
+    #         model_args.tokenizer_name
+    #         if model_args.tokenizer_name
+    #         else model_args.model_name_or_path,
+    #         use_fast=True
+    #     )
+    # else:
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.tokenizer_name
+        if model_args.tokenizer_name
+        else model_args.model_name_or_path,
+        use_fast=True,
+    )
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -136,35 +121,42 @@ def main(model_args, data_args, inf_args):
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
-        run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
+        run_mrc(data_args, training_args, model_args,
+                datasets, tokenizer, model)
 
 
 def run_sparse_retrieval(datasets, training_args, inf_args):
     #### retreival process ####
     if inf_args.retrieval == None:
-        retriever = SparseRetrieval(tokenize_fn=tokenize,
-                                    data_path="./data",
-                                    context_path="wikipedia_documents.json")
-    elif inf_args.retrieval.lower() =="bm25plus" or inf_args.retrieval.lower() =="bm25p":
+        # retriever = SparseRetrieval(tokenize_fn=tokenize,
+        #                             data_path="./data",
+        #                             context_path="wikipedia_documents.json")
         retriever = SparseRetrieval_BM25PLUS(tokenize_fn=tokenize,
-                                    data_path="./data",
-                                    context_path="wikipedia_documents.json")
-    elif inf_args.retrieval.lower() == "bm25":        
+                                             data_path="./data",
+                                             context_path="wikipedia_documents.json")
+    elif inf_args.retrieval.lower() == "bm25plus" or inf_args.retrieval.lower() == "bm25p":
+        retriever = SparseRetrieval_BM25PLUS(tokenize_fn=tokenize,
+                                             data_path="./data",
+                                             context_path="wikipedia_documents.json")
+    elif inf_args.retrieval.lower() == "bm25":
         retriever = SparseRetrieval_BM25(tokenize_fn=tokenize,
-                                    data_path="./data",
-                                    context_path="wikipedia_documents.json")
+                                         data_path="./data",
+                                         context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
-    df = retriever.retrieve(datasets['validation'], 10)
+    df = retriever.retrieve(
+        datasets['validation'], inf_args.k)
 
     # faiss retrieval
     # df = retriever.retrieve_faiss(dataset['validation'])
 
-    if training_args.do_predict: # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
-        f = Features({'context': Value(dtype='string', id=None),
+    # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
+    if training_args.do_predict:
+        f = Features({'contexts': Value(dtype='string', id=None),
                       'id': Value(dtype='string', id=None),
                       'question': Value(dtype='string', id=None)})
 
-    elif training_args.do_eval: # train data 에 대해선 정답이 존재하므로 id question context answer 로 데이터셋이 구성됩니다.
+    # train data 에 대해선 정답이 존재하므로 id question context answer 로 데이터셋이 구성됩니다.
+    elif training_args.do_eval:
         f = Features({'answers': Sequence(feature={'text': Value(dtype='string', id=None),
                                                    'answer_start': Value(dtype='int32', id=None)},
                                           length=-1, id=None),
@@ -172,23 +164,24 @@ def run_sparse_retrieval(datasets, training_args, inf_args):
                       'id': Value(dtype='string', id=None),
                       'question': Value(dtype='string', id=None)})
 
-    datasets = DatasetDict({'validation': Dataset.from_pandas(df, features=f)})
+    datasets = DatasetDict({'validation': Dataset.from_dict(df, features=f)})
     return datasets
 
 
 def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     # only for eval or predict
     column_names = datasets["validation"].column_names
-
+    # print(datasets['validation']['contexts'])
     question_column_name = "question" if "question" in column_names else column_names[0]
-    context_column_name = "context" if "context" in column_names else column_names[1]
+    contexts_column_name = "contexts" if "contexts" in column_names else column_names[1]
     answer_column_name = "answers" if "answers" in column_names else column_names[2]
 
     # Padding side determines if we do (question|context) or (context|question).
     pad_on_right = tokenizer.padding_side == "right"
 
     # check if there is an error
-    last_checkpoint, max_seq_length = check_no_error(training_args, data_args, tokenizer, datasets)
+    last_checkpoint, max_seq_length = check_no_error(
+        training_args, data_args, tokenizer, datasets)
     # last_checkpoint, max_seq_length = None, min(data_args.max_seq_length, tokenizer.model_max_length)
 
     # Validation preprocessing
@@ -196,9 +189,19 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
+        # with open('./data/kor_stops.json') as jf:
+        #     kor_stop = json.load(jf)
+
+        # for i in range(len(examples['contexts'])):
+        #     examples['contexts'][i] = examples['contexts'][i].replace(
+        #         "\n\n", " ")
+        #     for stop in kor_stop['stop_words']:
+        #         examples['contexts'][i] = examples['contexts'][i].replace(
+        #             f" {stop} ", " ")
+
         tokenized_examples = tokenizer(
-            examples[question_column_name if pad_on_right else context_column_name],
-            examples[context_column_name if pad_on_right else question_column_name],
+            examples[question_column_name if pad_on_right else contexts_column_name],
+            examples[contexts_column_name if pad_on_right else question_column_name],
             truncation="only_second" if pad_on_right else "only_first",
             max_length=max_seq_length,
             stride=data_args.doc_stride,
@@ -222,7 +225,8 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
 
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = sample_mapping[i]
-            tokenized_examples["example_id"].append(examples["id"][sample_index])
+            tokenized_examples["example_id"].append(
+                examples["id"][sample_index])
 
             # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
             # position is part of the context or not.
@@ -285,7 +289,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,
-        train_dataset= None,
+        train_dataset=None,
         eval_dataset=eval_dataset,
         eval_examples=datasets['validation'],
         tokenizer=tokenizer,
@@ -296,13 +300,14 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
 
     logger.info("*** Evaluate ***")
 
-    #### eval dataset & eval example - will create predictions.json
+    # eval dataset & eval example - will create predictions.json
     if training_args.do_predict:
         predictions = trainer.predict(test_dataset=eval_dataset,
-                                        test_examples=datasets['validation'])
+                                      test_examples=datasets['validation'])
 
         # predictions.json is already saved when we call postprocess_qa_predictions(). so there is no need to further use predictions.
-        print("No metric can be presented because there is no correct answer given. Job done!")
+        print(
+            "No metric can be presented because there is no correct answer given. Job done!")
 
     if training_args.do_eval:
         metrics = trainer.evaluate()
@@ -311,14 +316,12 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         trainer.log_metrics("test", metrics)
         trainer.save_metrics("test", metrics)
 
+
 if __name__ == "__main__":
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
-    parser = HfArgumentParser( # hint 만들어주는 것인듯?
+    parser = HfArgumentParser(  # hint 만들어주는 것인듯?
         (ModelArguments, DataTrainingArguments, InferencelArguments)
     )
     model_args, data_args, inf_args = parser.parse_args_into_dataclasses()
-    if model_args.reservation != None:
-        config, jobs = get_reservation()
-    else:
-        main(model_args, data_args, inf_args)
+    main(model_args, data_args, inf_args)

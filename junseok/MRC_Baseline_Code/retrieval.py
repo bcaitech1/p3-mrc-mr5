@@ -570,7 +570,9 @@ class SparseRetrieval_BM25PLUS:
                     "question": example["question"],
                     "id": example['id'],
                     # "context_ids": doc_indices[idx],  # retrieved id
-                    "contexts": '\n'.join([self.contexts[i] for i in doc_indices[idx]])  # retrieved doument
+                    "contexts": '\n'.join([self.contexts[i] for i in doc_indices[idx]]),  # retrieved doument
+                    # "contexts": [self.contexts[i] for i in doc_indices[idx]],  # retrieved doument
+                    "scores": doc_scores
                 }         
                 total.append(tmp)
             # return total

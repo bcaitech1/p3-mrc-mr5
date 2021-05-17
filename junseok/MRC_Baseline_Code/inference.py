@@ -27,7 +27,7 @@ from arguments import (
     InferencelArguments
 )
 
-import json
+# import json
 
 logger = logging.getLogger(__name__)
 
@@ -143,8 +143,7 @@ def run_sparse_retrieval(datasets, training_args, inf_args):
                                          data_path="./data",
                                          context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
-    df = retriever.retrieve(
-        datasets['validation'], inf_args.k)
+    df = retriever.retrieve(datasets['validation'].select(range(20)), inf_args.k)
 
     # faiss retrieval
     # df = retriever.retrieve_faiss(dataset['validation'])
@@ -164,7 +163,7 @@ def run_sparse_retrieval(datasets, training_args, inf_args):
                       'id': Value(dtype='string', id=None),
                       'question': Value(dtype='string', id=None)})
 
-    datasets = DatasetDict({'validation': Dataset.from_dict(df, features=f)})
+    datasets = DatasetDict({'validation': Dataset.from_dict(df)})
     return datasets
 
 
@@ -189,6 +188,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
+
         # with open('./data/kor_stops.json') as jf:
         #     kor_stop = json.load(jf)
 
@@ -197,8 +197,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         #         "\n\n", " ")
         #     for stop in kor_stop['stop_words']:
         #         examples['contexts'][i] = examples['contexts'][i].replace(
-        #             f" {stop} ", " ")
-
+        #             f" {stop} ", " ")     
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else contexts_column_name],
             examples[contexts_column_name if pad_on_right else question_column_name],
@@ -234,7 +233,48 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
                 (o if sequence_ids[k] == context_index else None)
                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
             ]
+        print("df")
         return tokenized_examples
+        # tokenized_examples_list = []     
+        # for idx in range(len(examples['id'])):
+        #     for rank in range(inf_args.k):
+        #         tokenized_examples = tokenizer(
+        #             examples[question_column_name if pad_on_right else contexts_column_name][idx],
+        #             examples[contexts_column_name if pad_on_right else question_column_name][idx][rank],
+        #             truncation="only_second" if pad_on_right else "only_first",
+        #             max_length=max_seq_length,
+        #             stride=data_args.doc_stride,
+        #             return_overflowing_tokens=True,
+        #             return_offsets_mapping=True,
+        #             padding="max_length" if data_args.pad_to_max_length else False,
+        #         )
+
+        #         # Since one example might give us several features if it has a long context, we need a map from a feature to
+        #         # its corresponding example. This key gives us just that.
+        #         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+
+        #         # For evaluation, we will need to convert our predictions to substrings of the context, so we keep the
+        #         # corresponding example_id and we will store the offset mappings.
+        #         tokenized_examples["example_id"] = []
+
+        #         for i in range(len(tokenized_examples["input_ids"])):
+        #             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
+        #             sequence_ids = tokenized_examples.sequence_ids(i)
+        #             context_index = 1 if pad_on_right else 0
+
+        #             # One example can give several spans, this is the index of the example containing this span of text.
+        #             sample_index = sample_mapping[i]
+        #             tokenized_examples["example_id"].append(
+        #                 examples["id"][sample_index])
+
+        #             # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
+        #             # position is part of the context or not.
+        #             tokenized_examples["offset_mapping"][i] = [
+        #                 (o if sequence_ids[k] == context_index else None)
+        #                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
+        #             ]
+        #         tokenized_examples_list.append(tokenized_examples)
+        # return tokenized_examples_list
 
     eval_dataset = datasets["validation"]
 
@@ -285,6 +325,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     print("init trainer...")
+    print(eval_dataset)
     # Initialize our Trainer
     trainer = QuestionAnsweringTrainer(
         model=model,

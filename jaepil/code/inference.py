@@ -16,7 +16,7 @@ from transformers import (
     DataCollatorWithPadding,
     EvalPrediction,
     HfArgumentParser,
-    TrainingArguments,
+    # TrainingArguments,
     set_seed,
 )
 
@@ -29,6 +29,7 @@ from arguments import (
     PathArguments,
     ModelArguments,
     DataTrainingArguments,
+    MyInferenceArguments,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,11 +40,11 @@ def main():
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
     parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments)
+        (ModelArguments, DataTrainingArguments, MyInferenceArguments)
     )
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    model_args, data_args, inference_args = parser.parse_args_into_dataclasses()
 
-    training_args.do_train = True
+    inference_args.do_train = True
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
@@ -56,10 +57,10 @@ def main():
     )
 
     # Set the verbosity to info of the Transformers logger (on main process only):
-    logger.info("Training/evaluation parameters %s", training_args)
+    logger.info("Training/evaluation parameters %s", inference_args)
 
     # Set seed before initializing model.
-    set_seed(training_args.seed)
+    set_seed(inference_args.seed)
 
     datasets = load_from_disk(data_args.dataset_name)
     print(datasets)
@@ -84,14 +85,14 @@ def main():
 
     # run passage retrieval if true
     if data_args.eval_retrieval:
-        datasets = run_sparse_retrieval(datasets, training_args)
+        datasets = run_sparse_retrieval(datasets, inference_args)
 
     # eval or predict mrc model
-    if training_args.do_eval or training_args.do_predict:
-        run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
+    if inference_args.do_eval or inference_args.do_predict:
+        run_mrc(data_args, inference_args, model_args, datasets, tokenizer, model)
 
 
-def run_sparse_retrieval(datasets, training_args):
+def run_sparse_retrieval(datasets, inference_args):
     #### retreival process ####
 
     retriever = SparseRetrieval(tokenize_fn=tokenize,
@@ -103,12 +104,12 @@ def run_sparse_retrieval(datasets, training_args):
     # faiss retrieval
     # df = retriever.retrieve_faiss(dataset['validation'])
 
-    if training_args.do_predict: # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
+    if inference_args.do_predict: # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
         f = Features({'context': Value(dtype='string', id=None),
                       'id': Value(dtype='string', id=None),
                       'question': Value(dtype='string', id=None)})
 
-    elif training_args.do_eval: # train data 에 대해선 정답이 존재하므로 id question context answer 로 데이터셋이 구성됩니다.
+    elif inference_args.do_eval: # train data 에 대해선 정답이 존재하므로 id question context answer 로 데이터셋이 구성됩니다.
         f = Features({'answers': Sequence(feature={'text': Value(dtype='string', id=None),
                                                    'answer_start': Value(dtype='int32', id=None)},
                                           length=-1, id=None),
@@ -120,7 +121,7 @@ def run_sparse_retrieval(datasets, training_args):
     return datasets
 
 
-def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
+def run_mrc(data_args, inference_args, model_args, datasets, tokenizer, model):
     # only for eval or predict
     column_names = datasets["validation"].column_names
 
@@ -132,7 +133,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     pad_on_right = tokenizer.padding_side == "right"
 
     # check if there is an error
-    last_checkpoint, max_seq_length = check_no_error(training_args, data_args, tokenizer, datasets)
+    last_checkpoint, max_seq_length = check_no_error(inference_args, data_args, tokenizer, datasets)
 
     # Validation preprocessing
     def prepare_validation_features(examples):
@@ -190,28 +191,28 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     # We have already padded to max length if the corresponding flag is True, otherwise we need to pad in the data collator.
     data_collator = (
         DataCollatorWithPadding(
-            tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None
+            tokenizer, pad_to_multiple_of=8 if inference_args.fp16 else None
         )
     )
 
     # Post-processing:
-    def post_processing_function(examples, features, predictions, training_args):
+    def post_processing_function(examples, features, predictions, inference_args):
         # Post-processing: we match the start logits and end logits to answers in the original context.
         predictions = postprocess_qa_predictions(
             examples=examples,
             features=features,
             predictions=predictions,
             max_answer_length=data_args.max_answer_length,
-            output_dir=training_args.output_dir,
+            output_dir=inference_args.output_dir,
         )
         # Format the result to the format the metric expects.
         formatted_predictions = [
             {"id": k, "prediction_text": v} for k, v in predictions.items()
         ]
-        if training_args.do_predict:
+        if inference_args.do_predict:
             return formatted_predictions
 
-        elif training_args.do_eval:
+        elif inference_args.do_eval:
             references = [
                 {"id": ex["id"], "answers": ex[answer_column_name]}
                 for ex in datasets["validation"]
@@ -227,7 +228,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     # Initialize our Trainer
     trainer = QuestionAnsweringTrainer(
         model=model,
-        args=training_args,
+        args=inference_args,
         train_dataset= None,
         eval_dataset=eval_dataset,
         eval_examples=datasets['validation'],
@@ -240,14 +241,14 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     logger.info("*** Evaluate ***")
 
     #### eval dataset & eval example - will create predictions.json
-    if training_args.do_predict:
+    if inference_args.do_predict:
         predictions = trainer.predict(test_dataset=eval_dataset,
                                         test_examples=datasets['validation'])
 
         # predictions.json is already saved when we call postprocess_qa_predictions(). so there is no need to further use predictions.
         print("No metric can be presented because there is no correct answer given. Job done!")
 
-    if training_args.do_eval:
+    if inference_args.do_eval:
         metrics = trainer.evaluate()
         metrics["eval_samples"] = len(eval_dataset)
 

@@ -9,7 +9,7 @@ from transformers import (
     DataCollatorWithPadding,
     EvalPrediction,
     HfArgumentParser,
-    TrainingArguments,
+    # TrainingArguments,
     set_seed,
 )
 
@@ -22,6 +22,7 @@ from arguments import (
     PathArguments,
     ModelArguments,
     DataTrainingArguments,
+    MyTrainingArguments, # Inherited from transformers.TrainingArguments
 )
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ def main():
 
     # CLI상에서 또는 default 값으로 정의된 Argument를 받아온다. 
     parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments)
+        (ModelArguments, DataTrainingArguments, MyTrainingArguments)
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 

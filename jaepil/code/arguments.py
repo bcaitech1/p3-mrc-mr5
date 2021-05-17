@@ -42,32 +42,52 @@ class PathArguments:
     output_path: Union[str, Path] = field(
         default=BASE_PATH / "output",
         metadata={"help": "Wrapper output data path containing train/test/models/processed directories"},
-    )
+        )
     processed_path: Union[str, Path] = field(
         default=output_path.default / "processed_data",
         metadata={"help": "Temp directory to store processed data"},
-    )
+        )
     train_output_path: Union[str, Path] = field(
         default=output_path.default / "train_dataset",
         metadata={"help": "Actual output(train) data path containing inference result"},
-    )
+        )
     test_output_path: Union[str, Path] = field(
         default=output_path.default / "test_dataset",
         metadata={"help": "Actual output(test) data path containing inference result"},
-    )
+        )
     model_output_path: Union[str, Path] = field(
         default=output_path.default / "models" / "train_dataset",
         metadata={"help": "Model output path containing trained models"},
-    )
+        )
 
 @dataclass
-class TrainingArguments(TrainingArguments):
+class MyTrainingArguments(TrainingArguments):
     """Inherits transformers.TrainingArguments to manage configs here
     """    
     output_dir: Union[str, Path] = field(
         default=PathArguments.model_output_path,
         metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
-    )
+        )
+    save_steps: int = field(
+        default=1000,
+        metadata={"help": "Save checkpoint every X updates steps."},
+        )
+    num_train_epochs: float = field(
+        default=3.0, 
+        metadata={"help": "Total number of training epochs to perform."},
+        )
+    # save_strategy: IntervalStrategy = field(
+    #     default="steps",
+    #     metadata={"help": "The checkpoint save strategy to use."},
+    # )
+@dataclass
+class MyInferenceArguments(TrainingArguments):
+    """Inherits transformers.TrainingArguments to manage configs here
+    """    
+    output_dir: Union[str, Path] = field(
+        default=PathArguments.test_output_path,
+        metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
+        )
 
 @dataclass
 class ModelArguments:

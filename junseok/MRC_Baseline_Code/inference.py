@@ -1,6 +1,5 @@
 """
 Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
-
 대부분의 로직은 train.py 와 비슷하나 retrieval, predict
 """
 
@@ -27,7 +26,8 @@ from arguments import (
     InferencelArguments
 )
 
-# import json
+import json
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def main(model_args, data_args, inf_args):
     )
     i = 0
     while os.path.exists(training_args.output_dir):
-        training_args.output_dir = f'./result/{model_name}{model_args.suffix}_{i}/'
+        training_args.output_dir = f'./submit/{model_name}{model_args.suffix}_{i}/'
         training_args.logging_dir = f'./logs/{model_name}{model_args.suffix}_{i}/'
         i += 1
 
@@ -143,16 +143,19 @@ def run_sparse_retrieval(datasets, training_args, inf_args):
                                          data_path="./data",
                                          context_path="wikipedia_documents.json")
     retriever.get_sparse_embedding()
-    df = retriever.retrieve(datasets['validation'].select(range(20)), inf_args.k)
+    dfs = retriever.retrieve(
+        datasets['validation'].select(range(11)), inf_args.k)
 
     # faiss retrieval
     # df = retriever.retrieve_faiss(dataset['validation'])
-
+    dfs= list(map(pd.DataFrame, dfs))
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
-        f = Features({'contexts': Value(dtype='string', id=None),
-                      'id': Value(dtype='string', id=None),
-                      'question': Value(dtype='string', id=None)})
+        f = Features({
+            'score': Value(dtype='float', id=None),
+            'context': Value(dtype='string', id=None),
+            'id': Value(dtype='string', id=None),
+            'question': Value(dtype='string', id=None)})
 
     # train data 에 대해선 정답이 존재하므로 id question context answer 로 데이터셋이 구성됩니다.
     elif training_args.do_eval:
@@ -162,17 +165,20 @@ def run_sparse_retrieval(datasets, training_args, inf_args):
                       'context': Value(dtype='string', id=None),
                       'id': Value(dtype='string', id=None),
                       'question': Value(dtype='string', id=None)})
-
-    datasets = DatasetDict({'validation': Dataset.from_dict(df)})
-    return datasets
+    dataset_topk = []
+    for df in dfs:
+        dataset_topk.append(DatasetDict(
+            {'validation': Dataset.from_pandas(df, features=f)}))
+    return dataset_topk
 
 
 def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
     # only for eval or predict
-    column_names = datasets["validation"].column_names
+    column_names = datasets[0]["validation"].column_names
     # print(datasets['validation']['contexts'])
+    data_num = datasets[0]["validation"].num_rows
     question_column_name = "question" if "question" in column_names else column_names[0]
-    contexts_column_name = "contexts" if "contexts" in column_names else column_names[1]
+    context_column_name = "context" if "context" in column_names else column_names[1]
     answer_column_name = "answers" if "answers" in column_names else column_names[2]
 
     # Padding side determines if we do (question|context) or (context|question).
@@ -180,7 +186,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
 
     # check if there is an error
     last_checkpoint, max_seq_length = check_no_error(
-        training_args, data_args, tokenizer, datasets)
+        training_args, data_args, tokenizer, datasets[0])
     # last_checkpoint, max_seq_length = None, min(data_args.max_seq_length, tokenizer.model_max_length)
 
     # Validation preprocessing
@@ -188,7 +194,6 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
-
         # with open('./data/kor_stops.json') as jf:
         #     kor_stop = json.load(jf)
 
@@ -197,10 +202,11 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         #         "\n\n", " ")
         #     for stop in kor_stop['stop_words']:
         #         examples['contexts'][i] = examples['contexts'][i].replace(
-        #             f" {stop} ", " ")     
+        #             f" {stop} ", " ")
+
         tokenized_examples = tokenizer(
-            examples[question_column_name if pad_on_right else contexts_column_name],
-            examples[contexts_column_name if pad_on_right else question_column_name],
+            examples[question_column_name if pad_on_right else context_column_name],
+            examples[context_column_name if pad_on_right else question_column_name],
             truncation="only_second" if pad_on_right else "only_first",
             max_length=max_seq_length,
             stride=data_args.doc_stride,
@@ -233,60 +239,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
                 (o if sequence_ids[k] == context_index else None)
                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
             ]
-        print("df")
         return tokenized_examples
-        # tokenized_examples_list = []     
-        # for idx in range(len(examples['id'])):
-        #     for rank in range(inf_args.k):
-        #         tokenized_examples = tokenizer(
-        #             examples[question_column_name if pad_on_right else contexts_column_name][idx],
-        #             examples[contexts_column_name if pad_on_right else question_column_name][idx][rank],
-        #             truncation="only_second" if pad_on_right else "only_first",
-        #             max_length=max_seq_length,
-        #             stride=data_args.doc_stride,
-        #             return_overflowing_tokens=True,
-        #             return_offsets_mapping=True,
-        #             padding="max_length" if data_args.pad_to_max_length else False,
-        #         )
-
-        #         # Since one example might give us several features if it has a long context, we need a map from a feature to
-        #         # its corresponding example. This key gives us just that.
-        #         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-
-        #         # For evaluation, we will need to convert our predictions to substrings of the context, so we keep the
-        #         # corresponding example_id and we will store the offset mappings.
-        #         tokenized_examples["example_id"] = []
-
-        #         for i in range(len(tokenized_examples["input_ids"])):
-        #             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-        #             sequence_ids = tokenized_examples.sequence_ids(i)
-        #             context_index = 1 if pad_on_right else 0
-
-        #             # One example can give several spans, this is the index of the example containing this span of text.
-        #             sample_index = sample_mapping[i]
-        #             tokenized_examples["example_id"].append(
-        #                 examples["id"][sample_index])
-
-        #             # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
-        #             # position is part of the context or not.
-        #             tokenized_examples["offset_mapping"][i] = [
-        #                 (o if sequence_ids[k] == context_index else None)
-        #                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
-        #             ]
-        #         tokenized_examples_list.append(tokenized_examples)
-        # return tokenized_examples_list
-
-    eval_dataset = datasets["validation"]
-
-    # Validation Feature Creation
-    eval_dataset = eval_dataset.map(
-        prepare_validation_features,
-        batched=True,
-        num_proc=data_args.preprocessing_num_workers,
-        remove_columns=column_names,
-        load_from_cache_file=not data_args.overwrite_cache,
-    )
-
     # Data collator
     # We have already padded to max length if the corresponding flag is True, otherwise we need to pad in the data collator.
     data_collator = (
@@ -295,10 +248,24 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         )
     )
 
+    def prepare_validation_feature_mapping(dataset):
+        eval_dataset = dataset["validation"]
+
+        # Validation Feature Creation
+        eval_dataset = eval_dataset.map(
+            prepare_validation_features,
+            batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+            remove_columns=column_names,
+            load_from_cache_file=not data_args.overwrite_cache,
+        )
+        return eval_dataset
+    eval_datasets = list(map(prepare_validation_feature_mapping, datasets))
+
     # Post-processing:
     def post_processing_function(examples, features, predictions, training_args):
         # Post-processing: we match the start logits and end logits to answers in the original context.
-        predictions = postprocess_qa_predictions(
+        all_predict, predictions = postprocess_qa_predictions(
             examples=examples,
             features=features,
             predictions=predictions,
@@ -310,14 +277,7 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
             {"id": k, "prediction_text": v} for k, v in predictions.items()
         ]
         if training_args.do_predict:
-            return formatted_predictions
-
-        elif training_args.do_eval:
-            references = [
-                {"id": ex["id"], "answers": ex[answer_column_name]}
-                for ex in datasets["validation"]
-            ]
-            return EvalPrediction(predictions=formatted_predictions, label_ids=references)
+            return all_predict, formatted_predictions, 
 
     metric = load_metric("squad")
 
@@ -325,37 +285,36 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     print("init trainer...")
-    print(eval_dataset)
     # Initialize our Trainer
-    trainer = QuestionAnsweringTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=None,
-        eval_dataset=eval_dataset,
-        eval_examples=datasets['validation'],
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        post_process_function=post_processing_function,
-        compute_metrics=compute_metrics,
-    )
-
     logger.info("*** Evaluate ***")
+    top_predictions = []
+    for eval_idx, eval_dataset in enumerate(eval_datasets):
+        trainer = QuestionAnsweringTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=None,
+            eval_dataset=eval_dataset,
+            eval_examples=datasets[eval_idx]['validation'],
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            post_process_function=post_processing_function,
+            compute_metrics=compute_metrics,
+        )
 
-    # eval dataset & eval example - will create predictions.json
-    if training_args.do_predict:
-        predictions = trainer.predict(test_dataset=eval_dataset,
-                                      test_examples=datasets['validation'])
 
+        # eval dataset & eval example - will create predictions.json
+        if training_args.do_predict:
+            all_predict, predictions  = trainer.predict(test_dataset=eval_dataset,
+                                        test_examples=datasets[eval_idx]['validation'])
+            top_predictions.append(all_predict)
         # predictions.json is already saved when we call postprocess_qa_predictions(). so there is no need to further use predictions.
-        print(
-            "No metric can be presented because there is no correct answer given. Job done!")
+    results = []
+    for row_i in range(data_num):       
+        for rank_i in range(inf_args.k): 
+            top_predictions[rank_i][row_i]['weighted_prob'] = top_predictions[rank_i][row_i]['probability'] * (datasets[rank_i]['validation']['score'][row_i])
+        results.append()
 
-    if training_args.do_eval:
-        metrics = trainer.evaluate()
-        metrics["eval_samples"] = len(eval_dataset)
-
-        trainer.log_metrics("test", metrics)
-        trainer.save_metrics("test", metrics)
+    print("No metric can be presented because there is no correct answer given. Job done!")
 
 
 if __name__ == "__main__":

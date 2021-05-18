@@ -564,20 +564,22 @@ class SparseRetrieval_BM25PLUS:
             total = []
             with timer("query exhaustive search"):
                 doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'], topk)
-            for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
-                # relev_doc_ids = [el for i, el in enumerate(self.ids) if i in doc_indices[idx]]
-                tmp = {
-                    "question": example["question"],
-                    "id": example['id'],
-                    # "context_ids": doc_indices[idx],  # retrieved id
-                    "contexts": '\n'.join([self.contexts[i] for i in doc_indices[idx]]),  # retrieved doument
-                    # "contexts": [self.contexts[i] for i in doc_indices[idx]],  # retrieved doument
-                    "scores": doc_scores
-                }         
+            for i in range(topk):
+                tmp = [] 
+                for idx, example in enumerate(tqdm(query_or_dataset, desc=f"Sparse retrieval top-{i}: ")):
+                    # relev_doc_ids = [el for i, el in enumerate(self.ids) if i in doc_indices[idx]]
+                        tmp.append({
+                            "question": example["question"],
+                            "id": example['id'],
+                            # "context_ids": doc_indices[idx],  # retrieved id
+                            # "contexts": '\n'.join([self.contexts[i] for i in doc_indices[idx]]),  # retrieved doument
+                            "context": self.contexts[doc_indices[idx][i]] ,  # retrieved doument
+                            "score": doc_scores[idx][i]
+                        })         
                 total.append(tmp)
-            # return total
-            cqas = pd.DataFrame(total)
-            return cqas
+            return total
+            # cqas = pd.DataFrame(total)
+            # return cqas
 
     def get_relevant_doc(self, query, k=1):
         result = self.bm25.get_scores(self.tokenize_fn(query))

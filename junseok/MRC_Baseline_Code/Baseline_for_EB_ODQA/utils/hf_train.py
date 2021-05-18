@@ -1,6 +1,8 @@
 import logging
 import os
 
+from datasets.dataset_dict import DatasetDict
+
 from .hf_funcs import postprocess_qa_predictions, check_no_error, QuestionAnsweringTrainer
 from datasets import load_metric
 from transformers import (
@@ -94,6 +96,7 @@ def run_mrc(train_args, dir_args, token_args, datasets, tokenizer, model):
 
     # Preprocessing the datasets.
     # Preprocessing is slighlty different for training and evaluation.
+            
     column_names = datasets["train"].column_names
     question_column_name = "question" if "question" in column_names else column_names[0]
     context_column_name = "context" if "context" in column_names else column_names[1]

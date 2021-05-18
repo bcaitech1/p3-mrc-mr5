@@ -129,9 +129,9 @@ def postprocess_qa_predictions(
     logger.info(
         f"Post-processing {len(examples)} example predictions split into {len(features)} features."
     )
-
+    pred_list = []
     # Let's loop over all the examples!
-    for example_index, example in enumerate(tqdm(examples)):
+    for example_index, example in enumerate(examples):
         # Those are the indices of the features associated to the current example.
         feature_indices = features_per_example[example_index]
 
@@ -222,7 +222,7 @@ def postprocess_qa_predictions(
             predictions.append(min_null_prediction)
 
         # Use the offsets to gather the answer text in the original context.
-        context = example["contexts"]
+        context = example["context"]
         for pred in predictions:
             offsets = pred.pop("offsets")
             pred["text"] = context[offsets[0] : offsets[1]]
@@ -282,39 +282,40 @@ def postprocess_qa_predictions(
             }
             for pred in predictions
         ]
+        pred_list.append(pred)
 
     # If we have an output_dir, let's save all those dicts.
-    if output_dir is not None:
-        assert os.path.isdir(output_dir), f"{output_dir} is not a directory."
+    # if output_dir is not None:
+    #     assert os.path.isdir(output_dir), f"{output_dir} is not a directory."
 
-        prediction_file = os.path.join(
-            output_dir,
-            "predictions.json" if prefix is None else f"predictions_{prefix}".json,
-        )
-        nbest_file = os.path.join(
-            output_dir,
-            "nbest_predictions.json"
-            if prefix is None
-            else f"nbest_predictions_{prefix}".json,
-        )
-        if version_2_with_negative:
-            null_odds_file = os.path.join(
-                output_dir,
-                "null_odds.json" if prefix is None else f"null_odds_{prefix}".json,
-            )
+    #     prediction_file = os.path.join(
+    #         output_dir,
+    #         "predictions.json" if prefix is None else f"predictions_{prefix}".json,
+    #     )
+    #     nbest_file = os.path.join(
+    #         output_dir,
+    #         "nbest_predictions.json"
+    #         if prefix is None
+    #         else f"nbest_predictions_{prefix}".json,
+    #     )
+    #     if version_2_with_negative:
+    #         null_odds_file = os.path.join(
+    #             output_dir,
+    #             "null_odds.json" if prefix is None else f"null_odds_{prefix}".json,
+    #         )
 
-        logger.info(f"Saving predictions to {prediction_file}.")
-        with open(prediction_file, "w") as writer:
-            writer.write(json.dumps(all_predictions, indent=4, ensure_ascii=False) + "\n")
-        logger.info(f"Saving nbest_preds to {nbest_file}.")
-        with open(nbest_file, "w") as writer:
-            writer.write(json.dumps(all_nbest_json, indent=4, ensure_ascii=False) + "\n")
-        if version_2_with_negative:
-            logger.info(f"Saving null_odds to {null_odds_file}.")
-            with open(null_odds_file, "w") as writer:
-                writer.write(json.dumps(scores_diff_json, indent=4, ensure_ascii=False) + "\n")
+    #     logger.info(f"Saving predictions to {prediction_file}.")
+    #     with open(prediction_file, "w") as writer:
+    #         writer.write(json.dumps(all_predictions, indent=4, ensure_ascii=False) + "\n")
+    #     logger.info(f"Saving nbest_preds to {nbest_file}.")
+    #     with open(nbest_file, "w") as writer:
+    #         writer.write(json.dumps(all_nbest_json, indent=4, ensure_ascii=False) + "\n")
+    #     if version_2_with_negative:
+    #         logger.info(f"Saving null_odds to {null_odds_file}.")
+    #         with open(null_odds_file, "w") as writer:
+    #             writer.write(json.dumps(scores_diff_json, indent=4, ensure_ascii=False) + "\n")
 
-    return all_predictions
+    return pred_list, all_predictions
 
 
 def check_no_error(training_args, data_args, tokenizer, datasets):

@@ -3,7 +3,7 @@ import logging
 import os
 import random
 import sys
-from datasets import load_from_disk
+from datasets import load_from_disk, DatasetDict
 
 import numpy as np
 import torch
@@ -298,6 +298,11 @@ def main():
             local_rank=train_args.local_rank
         )
         datasets = load_from_disk(dir_args.data_dir)
+        
+        if 'validation' not in datasets.column_names:
+            datasets = datasets.train_test_split(test_size=0.1)
+            datasets = DatasetDict({'train': datasets['train'], 'validation': datasets['test']})
+
         tokenizer = AutoTokenizer.from_pretrained(
             dir_args.model_dir_or_name,
             use_fast=True,

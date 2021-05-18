@@ -100,6 +100,10 @@ class MyInferenceArguments(TrainingArguments):
             )
         },
     )
+    k: int = field(
+        default=20,
+        metadata={"help": "Top k passage to retrieve"}
+    )
 
 @dataclass
 class ModelArguments:
@@ -137,7 +141,7 @@ class RetrievalArguments:
         metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"},
     )
     pororo_tokenizer_name: Optional[str] = field(
-        default="mecab.bpe32k.ko",
+        default="mecab.bpe64k.ko",
         metadata={"help": """
         Pororo's Korean tokenizers. Select from:
         

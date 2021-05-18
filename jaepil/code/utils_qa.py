@@ -25,18 +25,29 @@ from typing import Optional, Tuple
 import numpy as np
 from tqdm.auto import tqdm
 from konlpy.tag import Mecab
+from pororo import Pororo
 
 import torch
 import random
 from transformers import is_torch_available, PreTrainedTokenizerFast
 from transformers.trainer_utils import get_last_checkpoint
 
+from arguments import (
+    RetrievalArguments,
+)
+
 logger = logging.getLogger(__name__)
 
 mecab = Mecab()
+
+## Pororo tokenizer 추가
+pororo_model = RetrievalArguments.pororo_tokenizer_name
+pororo_tk = Pororo(task='tokenization', lang='ko', model=pororo_model)
+
 def tokenize(text):
     # return text.split(" ")
-    return mecab.morphs(text)
+    # return mecab.morphs(text)
+    return pororo_tk(text)
 
 def set_seed(seed: int):
     """

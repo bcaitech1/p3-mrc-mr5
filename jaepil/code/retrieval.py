@@ -248,11 +248,12 @@ if __name__ == "__main__":
 
     ## Pororo tokenizer 추가
     pororo_model = RetrievalArguments.pororo_tokenizer_name
-    pororo_pk = Pororo(task='tokenization', lang='ko', model=pororo_model)
+    pororo_tk = Pororo(task='tokenization', lang='ko', model=pororo_model)
     
     def tokenize(text):
-        # return text.split(" ")
-        return mecab.morphs(text)
+        # return text.split(" ") # space based tokenizer
+        # return mecab.morphs(text) # morph based mecab tokenizer
+        return pororo_tk(text)
 
     # from transformers import AutoTokenizer
     #

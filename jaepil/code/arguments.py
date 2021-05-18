@@ -8,7 +8,9 @@ from transformers import (
 from pathlib import Path
 import sys
 
-BASE_PATH = Path('.').resolve().parent
+# BASE_PATH = Path('.').resolve().parent
+BASE_PATH = Path("/opt/ml/jaepil").resolve()
+print(f"Current BASE_PATH is: {BASE_PATH}")
 sys.path.append(BASE_PATH.as_posix())
 @dataclass
 class PathArguments:
@@ -80,6 +82,7 @@ class MyTrainingArguments(TrainingArguments):
     #     default="steps",
     #     metadata={"help": "The checkpoint save strategy to use."},
     # )
+
 @dataclass
 class MyInferenceArguments(TrainingArguments):
     """Inherits transformers.TrainingArguments to manage configs here
@@ -88,6 +91,15 @@ class MyInferenceArguments(TrainingArguments):
         default=PathArguments.test_output_path,
         metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
         )
+    overwrite_output_dir: bool = field(
+        default=True,
+        metadata={
+            "help": (
+                "Overwrite the content of the output directory."
+                "Use this to continue training if output_dir points to a checkpoint directory."
+            )
+        },
+    )
 
 @dataclass
 class ModelArguments:
@@ -99,10 +111,66 @@ class ModelArguments:
         metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
     )
     config_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+        default=None, 
+        metadata={"help": "Pretrained config name or path if not the same as model_name"},
     )
     tokenizer_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+        default=None, 
+        metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"},
+    )
+
+@dataclass
+class RetrievalArguments:
+    """
+    Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
+    """
+    model_name_or_path: str = field(
+        default="bert-base-multilingual-cased",
+        metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+    )
+    config_name: Optional[str] = field(
+        default=None, 
+        metadata={"help": "Pretrained config name or path if not the same as model_name"},
+    )
+    tokenizer_name: Optional[str] = field(
+        default=None, 
+        metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"},
+    )
+    pororo_tokenizer_name: Optional[str] = field(
+        default="mecab.bpe32k.ko",
+        metadata={"help": """
+        Pororo's Korean tokenizers. Select from:
+        
+        bpe4k.ko, 
+        bpe8k.ko, 
+        bpe16k.ko, 
+        bpe32k.ko, 
+        bpe64k.ko, 
+
+        unigram4k.ko, 
+        unigram8k.ko, 
+        unigram16k.ko, 
+        unigram32k.ko, 
+        unigram64k.ko, 
+
+        jpe4k.ko, 
+        jpe8k.ko, 
+        jpe16k.ko, 
+        jpe32k.ko, 
+        jpe64k.ko, 
+
+        mecab.bpe4k.ko, 
+        mecab.bpe8k.ko, 
+        mecab.bpe16k.ko, 
+        mecab.bpe32k.ko, 
+        mecab.bpe64k.ko, 
+        
+        char, 
+        jamo, 
+        word, 
+        mecab_ko, 
+        sent_ko
+        """},
     )
 
 @dataclass

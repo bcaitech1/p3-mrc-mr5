@@ -14,6 +14,7 @@ from datasets import (
     concatenate_datasets,
 )
 from konlpy.tag import Mecab
+from pororo import Pororo
 
 import time
 from contextlib import contextmanager
@@ -25,6 +26,7 @@ from glob import glob
 ## Custom libraries
 from arguments import (
     PathArguments,
+    RetrievalArguments,
 )
 
 @contextmanager
@@ -243,6 +245,11 @@ if __name__ == "__main__":
 
     ### Mecab 이 가장 높은 성능을 보였기에 mecab 으로 선택 했습니다 ###
     mecab = Mecab()
+
+    ## Pororo tokenizer 추가
+    pororo_model = RetrievalArguments.pororo_tokenizer_name
+    pororo_pk = Pororo(task='tokenization', lang='ko', model=pororo_model)
+    
     def tokenize(text):
         # return text.split(" ")
         return mecab.morphs(text)
@@ -259,7 +266,6 @@ if __name__ == "__main__":
     retriever = SparseRetrieval(
         # tokenize_fn=tokenizer.tokenize,
         tokenize_fn=tokenize,
-        data_path="data",
         context_path=wiki_path)
 
     # test single query

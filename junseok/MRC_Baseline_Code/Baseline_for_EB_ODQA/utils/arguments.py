@@ -22,7 +22,7 @@ class TrainingArgumentsInputs:
         metadata={"help" : "The initial learning rate for Adam. (default: 5e-5)"}
     )
     epochs: int = field(
-        default=2,
+        default=4,
         metadata={"help": "Total number of training epochs to perform.(default: 2)"}
     )
     per_device_batch_size: int = field(
@@ -50,7 +50,7 @@ class TrainingArgumentsInputs:
         metadata={"help": "For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. (default: O2) See details at https://nvidia.github.io/apex/amp.html"}
     )
     save_total_limit: int = field(
-        default=1,
+        default=2,
         metadata={"help": "number of total save model.(default : 1)"}
     )
     evaluation_step_ratio: int = field(
@@ -92,15 +92,15 @@ class DirectoryArgumentsInputs:
         metadata={"help": "directory to save checkpoints(default: ./checkpoints/\{model_dir_or_name\}/)"}
     )
     model_dir_or_name: str = field(
-        default="sangrimlee/bert-base-multilingual-cased-korquad",
-        metadata={"help": "directory to get model or name of model in huggingface/model (default: sangrimlee/bert-base-multilingual-cased-korquad)"}
+        default="monologg/koelectra-base-v3-finetuned-korquad",
+        metadata={"help": "directory to get model or name of model in huggingface/model (default: monologg/koelectra-base-v3-finetuned-korquad)"}
     )
     suffix: str = field(
-        default=None,
+        default='',
         metadata={"help": "suffix for model distinction. (default: None)"}
     )
     data_dir: str = field(
-        default='./data/korquad/',
+        default='./data/KLUQUAD_shuffled/',
         metadata={"help": "directory to get training data. (default: ./data/korquad/)"}
     )
     submit_dir: str = field(

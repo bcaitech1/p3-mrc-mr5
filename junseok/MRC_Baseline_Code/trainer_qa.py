@@ -108,7 +108,7 @@ class QuestionAnsweringTrainer(Trainer):
                 columns=list(test_dataset.features.keys()),
             )
 
-        predictions = self.post_process_function(
+        all_predict, predictions = self.post_process_function(
             test_examples, test_dataset, output.predictions, self.args
         )
-        return predictions
+        return all_predict, predictions

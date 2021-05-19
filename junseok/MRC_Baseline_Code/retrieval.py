@@ -226,210 +226,6 @@ class SparseRetrieval:
         q_embs = query_vecs.toarray().astype(np.float32)
         D, I = self.indexer.search(q_embs, k)
         return D.tolist(), I.tolist()
-
-
-class SparseRetrieval_BM25:
-    def __init__(self, tokenize_fn,k1=1.5,b=0.75, data_path="./data/", context_path="wikipedia_documents.json"):
-        self.data_path = data_path
-        with open(os.path.join(data_path, context_path), "r") as f:
-            wiki = json.load(f)
-
-        self.contexts = list(dict.fromkeys([v['text'] for v in wiki.values()])) # set 은 매번 순서가 바뀌므로
-        print(f"Lengths of unique contexts : {len(self.contexts)}")
-        self.ids = list(range(len(self.contexts)))
-        self.k1=k1
-        self.b=b
-        # Transform by vectorizer
-        self.tfidfv = TfidfVectorizer(
-            tokenizer=tokenize_fn,
-            ngram_range=(1, 2),
-            max_features=50000,
-        )
-        self.p_embedding = None
-        self.indexer = None
-        self.avdl = None
-        self.len_context = None
-        self.isTest = None
-        if "test" in context_path:
-            self.isTest = True
-
-    def get_sparse_embedding(self):
-        if self.isTest:
-            print("Build passage embedding")
-            self.tfidfv.fit(self.contexts)
-            self.p_embedding = super(TfidfVectorizer,self.tfidfv).transform(self.contexts)
-            print("Embedding pickle saved.")            
-            self.avdl = self.p_embedding.sum(1).mean()
-            self.len_context = self.p_embedding.sum(1).A1
-            return
-        # Pickle save.
-        pickle_name = f"sparse_embedding_bm25.bin"
-        tfidfv_name = f"tfidv_bm25.bin"
-        emd_path = os.path.join(self.data_path, pickle_name)
-        tfidfv_path = os.path.join(self.data_path, tfidfv_name)
-        if os.path.isfile(emd_path) and os.path.isfile(tfidfv_path):
-            with open(emd_path, "rb") as file:
-                self.p_embedding = pickle.load(file)
-            with open(tfidfv_path, "rb") as file:
-                self.tfidfv = pickle.load(file)
-            self.avdl= self.p_embedding.sum(1).mean()
-            print("Embedding pickle load.")
-        else:
-            print("Build passage embedding")
-            self.tfidfv.fit(self.contexts)
-            self.p_embedding = super(TfidfVectorizer,self.tfidfv).transform(self.contexts)
-            print(self.p_embedding.shape)
-            with open(emd_path, "wb") as file:
-                pickle.dump(self.p_embedding, file)
-            with open(tfidfv_path, "wb") as file:
-                pickle.dump(self.tfidfv, file)
-            print("Embedding pickle saved.")
-            
-        self.avdl = self.p_embedding.sum(1).mean()
-        self.len_context = self.p_embedding.sum(1).A1
-
-    def build_faiss(self):
-        # FAISS build
-        num_clusters = 16
-        niter = 5
-
-        # 1. Clustering
-        p_emb = self.p_embedding.toarray().astype(np.float32)
-        emb_dim = p_emb.shape[-1]
-        index_flat = faiss.IndexFlatL2(emb_dim)
-
-        clus = faiss.Clustering(emb_dim, num_clusters)
-        clus.verbose = True
-        clus.niter = niter
-        clus.train(p_emb, index_flat)
-
-        centroids = faiss.vector_float_to_array(clus.centroids)
-        centroids = centroids.reshape(num_clusters, emb_dim)
-
-        quantizer = faiss.IndexFlatL2(emb_dim)
-        quantizer.add(centroids)
-
-        # 2. SQ8 + IVF indexer (IndexIVFScalarQuantizer)
-        self.indexer = faiss.IndexIVFScalarQuantizer(quantizer, quantizer.d, quantizer.ntotal, faiss.METRIC_L2)
-        self.indexer.train(p_emb)
-        self.indexer.add(p_emb)
-
-    def retrieve(self, query_or_dataset, topk=1):
-        assert self.p_embedding is not None, "You must build faiss by self.get_sparse_embedding() before you run self.retrieve()."
-        if isinstance(query_or_dataset, str):
-            doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
-            print("[Search query]\n", query_or_dataset, "\n")
-
-            for i in range(topk):
-                print("Top-%d passage with score %.4f" % (i + 1, doc_scores[i]))
-                print(self.contexts[doc_indices[i]])
-            return doc_scores, [self.contexts[doc_indices[i]] for i in range(topk)]
-
-        elif isinstance(query_or_dataset, Dataset):
-            # make retrieved result as dataframe
-            total = []
-            with timer("query exhaustive search"):
-                doc_scores, doc_indices = self.get_relevant_doc_bulk(query_or_dataset['question'], k=1)
-            for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
-                # relev_doc_ids = [el for i, el in enumerate(self.ids) if i in doc_indices[idx]]
-                tmp = {
-                    "question": example["question"],
-                    "id": example['id'],
-                    "context_id": doc_indices[idx][0],  # retrieved id
-                    "context": self.contexts[doc_indices[idx][0]]  # retrieved doument
-                }
-                if 'context' in example.keys() and 'answers' in example.keys():
-                    tmp["original_context"] = example['context']  # original document
-                    tmp["answers"] = example['answers']           # original answer
-                total.append(tmp)
-
-            cqas = pd.DataFrame(total)
-            return cqas
-
-    def get_relevant_doc(self, query, k=1):
-        """
-        참고: vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
-        """
-        with timer("transform"):
-            query_vec = self.tfidfv.transform([query])
-        assert (
-                np.sum(query_vec) != 0
-        ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
-        
-        context = self.p_embedding.tocsc()[:, query_vec.indices]
-        
-        denom = context + (self.k1 * (1-self.b + self.b*self.len_context/self.avdl))[:,None]
-
-        # smooth_idf=True(default) in tfidvectorizer fuction makes idf += 1 
-        idf = self.tfidfv._tfidf.idf_[None, query_vec.indices] - .75
-
-        numer = context.multiply(np.broadcast_to(idf, context.shape)) * (self.k1+1)
-        result = (numer / denom).sum(1).A1
-
-        if not isinstance(result, np.ndarray):
-            result = result.toarray()
-        # print(result)
-        sorted_result = np.argsort(result.squeeze())[::-1]
-        return result.squeeze()[sorted_result].tolist()[:k], sorted_result.tolist()[:k]
-
-    def get_relevant_doc_bulk(self, queries, k=1):
-        doc_scores = []
-        doc_indices = []
-        query_vec = self.tfidfv.transform(queries)
-        assert (
-                np.sum(query_vec) != 0
-        ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
-        context = self.p_embedding.tocsc()           
-        for q in tqdm(query_vec):
-            freq = context[:, q.indices]
-
-            denom = freq + (self.k1 * (1-self.b + self.b*self.len_context/self.avdl))[:,None]
-            
-            idf = self.tfidfv._tfidf.idf_[None, q.indices] - .75
-
-            numer = freq.multiply(np.broadcast_to(idf, freq.shape)) * (self.k1+1)
-            result = (numer / denom).sum(1).A1
-            if not isinstance(result, np.ndarray):
-                result = result.toarray()
-            sorted_result = np.argsort(result.squeeze())[::-1]
-            doc_scores.append(result.squeeze()[sorted_result].tolist()[:k])
-            doc_indices.append(sorted_result.tolist()[:k])
-        return doc_scores, doc_indices
-
-    def retrieve_faiss(self, query_or_dataset, topk=1):
-        assert self.indexer is not None, "You must build faiss by self.build_faiss() before you run self.retrieve_faiss()."
-
-        if isinstance(query_or_dataset, str):
-            doc_scores, doc_indices = self.get_relevant_doc_faiss(query_or_dataset, k=topk)
-            print("[Search query]\n", query_or_dataset, "\n")
-
-            for i in range(topk):
-                print("Top-%d passage with score %.4f" % (i + 1, doc_scores[i]))
-                print(self.contexts[doc_indices[i]])
-            return doc_scores, [self.contexts[doc_indices[i]] for i in range(topk)]
-
-        elif isinstance(query_or_dataset, Dataset):
-            queries = query_or_dataset['question']
-            # make retrieved result as dataframe
-            total = []
-            with timer("query faiss search"):
-                doc_scores, doc_indices = self.get_relevant_doc_bulk_faiss(queries, k=topk)
-            for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
-                # relev_doc_ids = [el for i, el in enumerate(self.ids) if i in doc_indices[idx]]
-                tmp = {
-                    "question": example["question"],
-                    "id": example['id'],  # original id
-                    "context_id": doc_indices[idx][0],  # retrieved id
-                    "context": self.contexts[doc_indices[idx][0]]  # retrieved doument
-                }
-                if 'context' in example.keys() and 'answers' in example.keys():
-                    tmp["original_context"]: example['context']  # original document
-                    tmp["answers"]: example['answers']           # original answer
-                total.append(tmp)
-
-            cqas = pd.DataFrame(total)
-            return cqas
-
             
 class SparseRetrieval_BM25PLUS:
     def __init__(self, tokenize_fn, data_path="./data/", context_path="wikipedia_documents.json"):
@@ -450,23 +246,12 @@ class SparseRetrieval_BM25PLUS:
             self.tokenized_contexts = [self.tokenize_fn(v) for v in self.contexts]
             with open(tk_wiki_path, "wb") as file:
                 pickle.dump(self.tokenized_contexts, file)
-            # with open(tfidfv_path, "wb") as file:
-            #     pickle.dump(self.tfidfv, file)
             print("tk_wiki pickle saved.")
 
 
         print(f"Lengths of unique contexts : {len(self.tokenized_contexts)}")
-        # self.ids = list(range(len(self.contexts)))
-
-        # Transform by vectorizer
-        # self.tfidfv = TfidfVectorizer(
-        #     tokenizer=tokenize_fn,
-        #     ngram_range=(1, 2),
-        #     max_features=50000,
-        # )
         # should run get_sparse_embedding() or build_faiss() first.
         self.bm25 = None
-        # self.indexer = None
 
     def get_sparse_embedding(self):
         # Pickle save.
@@ -488,32 +273,6 @@ class SparseRetrieval_BM25PLUS:
             # with open(tfidfv_path, "wb") as file:
             #     pickle.dump(self.tfidfv, file)
             print("Embedding pickle saved.")
-
-    # def build_faiss(self):
-    #     # FAISS build
-    #     num_clusters = 16
-    #     niter = 5
-
-    #     # 1. Clustering
-    #     p_emb = self.p_embedding.toarray().astype(np.float32)
-    #     emb_dim = p_emb.shape[-1]
-    #     index_flat = faiss.IndexFlatL2(emb_dim)
-
-    #     clus = faiss.Clustering(emb_dim, num_clusters)
-    #     clus.verbose = True
-    #     clus.niter = niter
-    #     clus.train(p_emb, index_flat)
-
-    #     centroids = faiss.vector_float_to_array(clus.centroids)
-    #     centroids = centroids.reshape(num_clusters, emb_dim)
-
-    #     quantizer = faiss.IndexFlatL2(emb_dim)
-    #     quantizer.add(centroids)
-
-    #     # 2. SQ8 + IVF indexer (IndexIVFScalarQuantizer)
-    #     self.indexer = faiss.IndexIVFScalarQuantizer(quantizer, quantizer.d, quantizer.ntotal, faiss.METRIC_L2)
-    #     self.indexer.train(p_emb)
-    #     self.indexer.add(p_emb)
 
     def retrieve_for_eval(self, query_or_dataset, topk=1):
         assert self.bm25 is not None, "You must build faiss by self.get_sparse_embedding() before you run self.retrieve()."
@@ -632,42 +391,16 @@ if __name__ == "__main__":
     ###############################################################
 
     wiki_path = "wikipedia_documents.json"
-    # retriever = SparseRetrieval_BM25(
-    #     # tokenize_fn=tokenizer.tokenize,
-    #     tokenize_fn=tokenize,
-    #     data_path="./data",
-    #     context_path=wiki_path)
     test_path = "test.json"
     retriever = SparseRetrieval_BM25PLUS(
-        # tokenize_fn=tokenizer.tokenize,
         tokenize_fn=tokenize,
         data_path="./data",
         context_path=wiki_path
-        # context_path=test_path
         )
 
-    # retriever = SparseRetrieval(
-    #     # tokenize_fn=tokenizer.tokenize,
-    #     tokenize_fn=tokenize,
-    #     data_path="./data",
-    #     context_path=wiki_path)
-
     retriever.get_sparse_embedding()
-    # test single query
-    query = "대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?"
-    
-    # query = "다키스트 던전을 개발한 게임사 이름은?"
-    # with timer("single query by exhaustive search"):
-    #     scores, indices = retriever.retrieve_for_eval(query)
-    # with timer("single query by faiss"):
-    #     scores, indices = retriever.retrieve_faiss(query)
 
     # test bulk
     with timer("bulk query by exhaustive search"):
         df = retriever.retrieve_for_eval(full_ds, 3)
-        # df['correct'] = df[df['original_index'] in df['context_ids']] 
         print("correct retrieval result by exhaustive search", df['correct'].sum() / len(df))
-    # with timer("bulk query by exhaustive search"):
-    #     df = retriever.retrieve_faiss(full_ds)
-    #     df['correct'] = df['original_context'] == df['context']
-    #     print("correct retrieval result by faiss", df['correct'].sum() / len(df))

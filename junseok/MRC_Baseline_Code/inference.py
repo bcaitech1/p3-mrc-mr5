@@ -308,11 +308,15 @@ def run_mrc(data_args, training_args, model_args, datasets, tokenizer, model):
                                         test_examples=datasets[eval_idx]['validation'])
             top_predictions.append(all_predict)
         # predictions.json is already saved when we call postprocess_qa_predictions(). so there is no need to further use predictions.
+    top_predictions = pd.DataFrame(top_predictions)
     results = []
-    for row_i in range(data_num):       
+    
+    for row_i in range(data_num):   
         for rank_i in range(inf_args.k): 
-            top_predictions[rank_i][row_i]['weighted_prob'] = top_predictions[rank_i][row_i]['probability'] * (datasets[rank_i]['validation']['score'][row_i])
-        results.append()
+            top_predictions[row_i][rank_i].pop('start_logit')
+            top_predictions[row_i][rank_i].pop('end_logit')
+            top_predictions[row_i][rank_i]['weighted_prob'] = top_predictions[row_i][rank_i]['probability'] * (datasets[rank_i]['validation']['score'][row_i])
+
 
     print("No metric can be presented because there is no correct answer given. Job done!")
 

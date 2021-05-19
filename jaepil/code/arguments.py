@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 from transformers import (
     TrainingArguments,
 )
+from transformers.trainer_utils import IntervalStrategy
 
 from pathlib import Path
 import sys
@@ -21,7 +22,7 @@ class PathArguments:
         metadata={"help": "Actual root path of the data"},
         )
     train_path: Union[str, Path] = field(
-        default=data_path.default / "train_dataset",
+        default=data_path.default / "kluquad",
         metadata={"help": "Wrapper train data path containing metadata"},
         )
     train_data_path: Union[str, Path] = field(
@@ -70,18 +71,33 @@ class MyTrainingArguments(TrainingArguments):
         default=PathArguments.model_output_path,
         metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
         )
-    save_steps: int = field(
-        default=1000,
-        metadata={"help": "Save checkpoint every X updates steps."},
-        )
     num_train_epochs: float = field(
         default=3.0, 
         metadata={"help": "Total number of training epochs to perform."},
         )
-    # save_strategy: IntervalStrategy = field(
-    #     default="steps",
-    #     metadata={"help": "The checkpoint save strategy to use."},
-    # )
+    save_steps: int = field(
+        default=1000,
+        metadata={"help": "Save checkpoint every X updates steps."},
+        )
+    save_total_limit: Optional[int] = field(
+        default=1,
+        metadata={
+            "help": (
+                "Limit the total amount of checkpoints."
+                "Deletes the older checkpoints in the output_dir. Default is unlimited checkpoints"
+            )
+        },
+    )
+    save_strategy: IntervalStrategy = field(
+        default="steps",
+        metadata={"help": "The checkpoint save strategy to use."},
+    )
+        # save_strategy (:obj:`str` or :class:`~transformers.trainer_utils.IntervalStrategy`, `optional`, defaults to :obj:`"steps"`):
+        #     The checkpoint save strategy to adopt during training. Possible values are:
+
+        #         * :obj:`"no"`: No save is done during training.
+        #         * :obj:`"epoch"`: Save is done at the end of each epoch.
+        #         * :obj:`"steps"`: Save is done every :obj:`save_steps`.
 
 @dataclass
 class MyInferenceArguments(TrainingArguments):

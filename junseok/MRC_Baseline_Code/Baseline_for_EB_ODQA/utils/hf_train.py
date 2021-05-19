@@ -14,6 +14,16 @@ logger = logging.getLogger(__name__)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def run_mrc(train_args, dir_args, token_args, datasets, tokenizer, model):
+    # Preprocessing the datasets.
+    # Preprocessing is slighlty different for training and evaluation.
+            
+    column_names = datasets["train"].column_names
+    question_column_name = "question" if "question" in column_names else column_names[0]
+    context_column_name = "context" if "context" in column_names else column_names[1]
+    answer_column_name = "answers" if "answers" in column_names else column_names[2]
+
+        
+        
         # Training preprocessing
     def prepare_train_features(examples):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
@@ -94,13 +104,6 @@ def run_mrc(train_args, dir_args, token_args, datasets, tokenizer, model):
 
         return tokenized_examples
 
-    # Preprocessing the datasets.
-    # Preprocessing is slighlty different for training and evaluation.
-            
-    column_names = datasets["train"].column_names
-    question_column_name = "question" if "question" in column_names else column_names[0]
-    context_column_name = "context" if "context" in column_names else column_names[1]
-    answer_column_name = "answers" if "answers" in column_names else column_names[2]
 
     # Padding side determines if we do (question|context) or (context|question).
     pad_on_right = tokenizer.padding_side == "right"
@@ -209,6 +212,7 @@ def run_mrc(train_args, dir_args, token_args, datasets, tokenizer, model):
     def compute_metrics(p: EvalPrediction):
         result = metric.compute(predictions=p.predictions, references=p.label_ids)
         result['eval_exact_match'] = result['exact_match']
+        result.pop('exact_match')
         return result
 
     # Initialize our Trainer

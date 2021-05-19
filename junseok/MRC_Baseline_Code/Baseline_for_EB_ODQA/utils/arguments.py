@@ -6,17 +6,32 @@ class InferencelArgumentsInputs:
     """
     Arguments Inference and Evaluation step.
     """
-    retrieval: str = field(
+    retri: str = field(
         default=None,
-        metadata={"help": "retrieval method for retrieval step(default: TF-IDF Sparse)"}
+        metadata={"help": "retrieval method for retrieval step(default: BM25plus)"}
     )
-
+    k: int = field(
+        default=5,
+        metadata={"help": "top-k number(default: 5)"}
+    )
+    top_join : str = field(
+        default= 'sep',
+        metadata={"help": "top-k merge method('sep': evaluate each k, 'whole': merge to one article)(default: 'sep')"}
+    )
+    is_eval: bool = field(
+        default= False,
+        metadata={"help": "check True if you want to use validation dataset."}
+    )
     
 @dataclass
 class TrainingArgumentsInputs:
     """
     Arguments for Training Model.
     """
+    k_fold: int = field(
+        default=1,
+        metadata={"help": "model number of k-fold validation(default: no)"}
+    )
     learning_rate: float = field(
         default=5e-5,
         metadata={"help" : "The initial learning rate for Adam. (default: 5e-5)"}
@@ -50,11 +65,11 @@ class TrainingArgumentsInputs:
         metadata={"help": "For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. (default: O2) See details at https://nvidia.github.io/apex/amp.html"}
     )
     save_total_limit: int = field(
-        default=2,
+        default=1,
         metadata={"help": "number of total save model.(default : 1)"}
     )
     evaluation_step_ratio: int = field(
-        default=16,
+        default=8,
         metadata={"help": "step term about evaluation and save model / per_device_batch_size(default: 16)"}
     )
     gradient_accumulation_steps: Optional[int] = field(
@@ -79,14 +94,6 @@ class DirectoryArgumentsInputs:
     """
     Arguments for Data and Output target directoies.
     """
-    huggingface: bool = field(
-        default=True,
-        metadata={"help": "using huggingface Trainer to train your model (default: True)"}
-    )
-    get_last_ckpt: bool = field(
-        default=False,
-        metadata={"help": "if you want to continue training, give it True.(default: False)"}
-    )
     output_dir: str = field(
         default='./checkpoints/',
         metadata={"help": "directory to save checkpoints(default: ./checkpoints/\{model_dir_or_name\}/)"}
@@ -100,7 +107,7 @@ class DirectoryArgumentsInputs:
         metadata={"help": "suffix for model distinction. (default: None)"}
     )
     data_dir: str = field(
-        default='./data/KLUQUAD_shuffled/',
+        default='./data/KLUQUAD/',
         metadata={"help": "directory to get training data. (default: ./data/korquad/)"}
     )
     submit_dir: str = field(

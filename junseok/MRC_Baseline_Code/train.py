@@ -25,21 +25,11 @@ from arguments import (
 
 logger = logging.getLogger(__name__)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-def main():
-    # wandb.init(
-    #     project="koelectra",
-    #     entity='roadv',
-    #     tags=["baseline", "test"],
-    #     group="electra"
-    # )
-    # config = wandb.config
-    # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
-    # --help flag 를 실행시켜서 확인할 수 도 있습니다.    
+def main(): 
     parser = HfArgumentParser( # hint 만들어주는 것인듯?
         (ModelArguments, DataTrainingArguments)
     )
     model_args, data_args = parser.parse_args_into_dataclasses()
-    # if model_args.reservation:
 
     temp = model_args.model_name_or_path
     if temp==None:
@@ -112,15 +102,6 @@ def main():
         if model_args.config_name
         else model_args.model_name_or_path,
     )
-    # if "ko" in model_args.model_name_or_path and "bert" in model_args.model_name_or_path:
-    #     print(f"using korean tokenizer for {model_args.model_name_or_path}")
-    #     tokenizer = KoBertTokenizer.from_pretrained(
-    #         model_args.tokenizer_name
-    #         if model_args.tokenizer_name
-    #         else model_args.model_name_or_path,
-    #         # use_fast=True
-    #     )
-    # else:
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name

@@ -75,6 +75,29 @@ class MyTrainingArguments(TrainingArguments):
         default=3.0, 
         metadata={"help": "Total number of training epochs to perform."},
         )
+    learning_rate: float = field(
+        default=1e-5, 
+        metadata={"help": "The initial learning rate for AdamW."}
+        )
+    warmup_steps: int = field(
+        default=500, 
+        metadata={"help": "Linear warmup over warmup_steps."}
+        )
+    per_device_train_batch_size: int = field(
+        default=16, metadata={"help": "Batch size per GPU/TPU core/CPU for training."}
+    )
+    load_best_model_at_end: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether or not to load the best model found during training at the end of training."},
+    )
+    metric_for_best_model: Optional[str] = field(
+        default="exact_match", metadata={"help": "The metric to use to compare two different models."}
+    )
+    greater_is_better: Optional[bool] = field(
+        default=True, metadata={"help": "Whether the `metric_for_best_model` should be maximized or not."}
+    )
+
+    # save steps ignored if load_best_model_at_end is True
     save_steps: int = field(
         default=1000,
         metadata={"help": "Save checkpoint every X updates steps."},
@@ -127,7 +150,7 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     model_name_or_path: str = field(
-        default="bert-base-multilingual-cased",
+        default="monologg/koelectra-base-v3-finetuned-korquad",
         metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
     )
     config_name: Optional[str] = field(

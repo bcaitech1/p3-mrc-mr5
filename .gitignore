@@ -415,7 +415,7 @@ junseok/MRC_Baseline_Code/data/*
 junseok/MRC_Baseline_Code/result/*
 junseok/MRC_Baseline_Code/submit/*
 junseok/MRC_Baseline_Code/wandb/*
-junseok/MRC_Baseline_Code/Baseline_for_EB_ODQA_original/*
-junseok/MRC_Baseline_Code/Baseline_for_EB_ODQA/data/*
-junseok/MRC_Baseline_Code/Baseline_for_EB_ODQA/checkpoints/*
-junseok/MRC_Baseline_Code/Baseline_for_EB_ODQA/wandb/*
+junseok/Baseline_for_EB_ODQA/data/*
+junseok/Baseline_for_EB_ODQA/checkpoints/*
+junseok/Baseline_for_EB_ODQA/submit/*
+junseok/Baseline_for_EB_ODQA/wandb/*

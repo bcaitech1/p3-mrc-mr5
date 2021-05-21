@@ -1,1 +1,0 @@
-print(range(int(0.2),int(1.2)))
